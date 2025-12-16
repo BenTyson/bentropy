@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { EntropyField } from "@/components/particles/EntropyField";
-import { CrystallizeText } from "@/components/particles/CrystallizeText";
+import { ParticleLetter } from "@/components/particles/ParticleLetter";
 import { NebulaBackground } from "@/components/particles/NebulaBackground";
 import { ProjectCard } from "@/components/public/ProjectCard";
 import { ArrowRight, Sparkles } from "lucide-react";
@@ -102,14 +102,27 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative min-h-[90vh] flex flex-col items-center justify-center px-6">
         <div className="text-center max-w-4xl mx-auto">
-          {/* Main Title - Crystallizes from chaos */}
-          <h1 className="text-6xl md:text-8xl font-bold mb-6">
-            <CrystallizeText
-              text="Bentropy"
-              className="gradient-text"
+          {/* Main Title - "B" formed by particles + static "ENTROPY" */}
+          <h1 className="text-6xl md:text-8xl font-bold mb-6 flex items-center justify-center">
+            {/* Particle-formed B */}
+            <ParticleLetter
+              letter="B"
+              width={80}
+              height={100}
+              particleCount={200}
               delay={500}
-              onComplete={() => setHeroComplete(true)}
+              onAnimationComplete={() => setHeroComplete(true)}
+              className="md:w-[120px] md:h-[150px]"
             />
+            {/* Static ENTROPY text - fades in as B forms */}
+            <motion.span
+              className="gradient-text"
+              initial={{ opacity: 0.3 }}
+              animate={{ opacity: heroComplete ? 1 : 0.3 }}
+              transition={{ duration: 0.8 }}
+            >
+              ENTROPY
+            </motion.span>
           </h1>
 
           {/* Tagline */}
