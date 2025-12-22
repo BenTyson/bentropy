@@ -32,8 +32,8 @@ interface ParticleData {
 export function ParticleLetter({
   letter,
   className = "",
-  width = 120,
-  height = 150,
+  width = 140,
+  height = 170,
   particleCount = 250,
   colors = ["#3b82f6", "#8b5cf6", "#06b6d4"], // blue, violet, cyan
   delay = 500,
@@ -41,6 +41,7 @@ export function ParticleLetter({
 }: ParticleLetterProps) {
   const [isAnimating, setIsAnimating] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [showSolidLetter, setShowSolidLetter] = useState(false);
   const [particleData, setParticleData] = useState<ParticleData[]>([]);
   const shouldReduceMotion = useReducedMotion();
   const hasInitialized = useRef(false);
@@ -71,8 +72,8 @@ export function ParticleLetter({
         color: colors[Math.floor(Math.random() * colors.length)],
         // Random size variation
         size: 2 + Math.random() * 2,
-        // Staggered delay
-        delay: (i / particlePositions.length) * 0.8,
+        // Staggered delay - slower fly in
+        delay: (i / particlePositions.length) * 1.5,
         // Random opacity
         opacity: 0.6 + Math.random() * 0.4,
       }));
@@ -95,7 +96,11 @@ export function ParticleLetter({
   const handleAnimationComplete = () => {
     if (!isComplete) {
       setIsComplete(true);
-      onAnimationComplete?.();
+      // Delay showing solid letter to let particles settle briefly
+      setTimeout(() => {
+        setShowSolidLetter(true);
+        onAnimationComplete?.();
+      }, 300);
     }
   };
 
@@ -140,86 +145,62 @@ export function ParticleLetter({
       className={`relative ${className}`}
       style={{ width, height }}
     >
-      {particleData.map((particle, index) => (
-        <motion.div
-          key={particle.id}
-          className="absolute rounded-full"
-          style={{
-            width: particle.size,
-            height: particle.size,
-            backgroundColor: particle.color,
-            boxShadow: `0 0 ${particle.size * 2}px ${particle.color}`,
-          }}
-          initial={{
-            x: particle.startX,
-            y: particle.startY,
-            scale: 0,
-            opacity: 0,
-            left: "50%",
-            top: "50%",
-          }}
-          animate={
-            isAnimating
-              ? {
-                  x: particle.targetX,
-                  y: particle.targetY,
-                  scale: 1,
-                  opacity: particle.opacity,
-                }
-              : {
-                  x: particle.startX,
-                  y: particle.startY,
-                  scale: 0.5,
-                  opacity: 0.3,
-                }
-          }
-          transition={{
-            type: "spring",
-            damping: 20,
-            stiffness: 80,
-            delay: isAnimating ? particle.delay : 0,
-            duration: isAnimating ? undefined : 0,
-          }}
-          onAnimationComplete={
-            index === particleData.length - 1 ? handleAnimationComplete : undefined
-          }
-        />
-      ))}
+      {/* Particles - fade out when solid letter appears */}
+      <motion.div
+        className="absolute inset-0"
+        animate={{ opacity: showSolidLetter ? 0 : 1 }}
+        transition={{ duration: 0.6 }}
+      >
+        {particleData.map((particle, index) => (
+          <motion.div
+            key={particle.id}
+            className="absolute rounded-full"
+            style={{
+              width: particle.size,
+              height: particle.size,
+              backgroundColor: particle.color,
+              boxShadow: `0 0 ${particle.size * 2}px ${particle.color}`,
+            }}
+            initial={{
+              x: particle.startX,
+              y: particle.startY,
+              scale: 0.8,
+              opacity: 0.5,
+              left: "50%",
+              top: "50%",
+            }}
+            animate={{
+              x: isAnimating ? particle.targetX : particle.startX,
+              y: isAnimating ? particle.targetY : particle.startY,
+              scale: isAnimating ? 1 : 0.8,
+              opacity: isAnimating ? particle.opacity : 0.5,
+            }}
+            transition={{
+              type: "spring",
+              damping: 25,
+              stiffness: 50,
+              delay: isAnimating ? particle.delay : 0,
+            }}
+            onAnimationComplete={
+              index === particleData.length - 1 ? handleAnimationComplete : undefined
+            }
+          />
+        ))}
+      </motion.div>
 
-      {/* Subtle idle animation after formation */}
-      {isComplete && (
-        <motion.div
-          className="absolute inset-0 pointer-events-none"
+      {/* Solid text B that fades in after particles settle - matches ENTROPY text size */}
+      {showSolidLetter && (
+        <motion.span
+          className="absolute inset-0 flex items-center justify-center font-bold pointer-events-none gradient-text"
+          style={{
+            fontSize: "inherit",
+          }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5 }}
         >
-          {particleData.map((particle) => (
-            <motion.div
-              key={`glow-${particle.id}`}
-              className="absolute rounded-full pointer-events-none"
-              style={{
-                width: particle.size * 1.5,
-                height: particle.size * 1.5,
-                backgroundColor: particle.color,
-                filter: `blur(${particle.size}px)`,
-                left: `calc(50% + ${particle.targetX}px)`,
-                top: `calc(50% + ${particle.targetY}px)`,
-                transform: "translate(-25%, -25%)",
-              }}
-              animate={{
-                opacity: [0.2, 0.4, 0.2],
-                scale: [1, 1.2, 1],
-              }}
-              transition={{
-                duration: 2 + Math.random() * 2,
-                repeat: Infinity,
-                repeatType: "reverse",
-                ease: "easeInOut",
-              }}
-            />
-          ))}
-        </motion.div>
+          {letter}
+        </motion.span>
       )}
     </div>
   );

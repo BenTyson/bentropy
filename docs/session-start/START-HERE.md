@@ -6,11 +6,11 @@ Welcome, agent. This document will get you up to speed on the Bentropy project.
 
 | Document | Purpose |
 |----------|---------|
-| [Project Overview](../README.md) | High-level project description and philosophy |
+| [Current Status](../progress/STATUS.md) | **Read this first** - What's done, what's next |
 | [Architecture](../architecture/OVERVIEW.md) | Technical stack and structure |
-| [Current Status](../progress/STATUS.md) | What's done, what's in progress |
+| [Database Schema](../architecture/DATABASE.md) | Table definitions and relationships |
 | [Decisions Log](../decisions/LOG.md) | Key decisions and rationale |
-| [Feature Specs](../features/INDEX.md) | Detailed feature documentation |
+| [Quick Tasks](./QUICK-TASKS.md) | Common development tasks |
 
 ## What is Bentropy?
 
@@ -21,27 +21,39 @@ Welcome, agent. This document will get you up to speed on the Bentropy project.
 - Nebula backgrounds representing the cosmic void
 - An "entropy meter" in the admin dashboard
 
+## Current State (December 2024)
+
+**Both public site and admin dashboard are complete with placeholder data.**
+
+- All 13 pages compile and render correctly
+- Admin has full CRUD UI for all 6 modules
+- Data is currently local React state (not persisted)
+- Database schema exists but not yet deployed to Supabase
+
 ## The Two Parts
 
 ### 1. Public Site (/)
-- Landing page with particle animation hero
+- Landing page with CrystallizeText hero animation
 - Project showcase with filterable gallery
 - Individual project pages (Problem → Solution → Outcome narrative)
 - About page with the Bentropy philosophy
 
 ### 2. Admin Dashboard (/admin)
-- Personal "command center" for managing chaos
-- Projects CRUD, Credentials vault, Local services tracker
-- Repository links, Login manager, Notes scratchpad
-- Entropy meter showing current chaos level
+- **Dashboard** - Stats overview and entropy meter
+- **Projects** - CRUD with status, tags, featured flag
+- **Credentials** - API key vault with expiration tracking
+- **Services** - Local dev server port tracking
+- **Repos** - GitHub repository links
+- **Logins** - Password manager by category
+- **Notes** - Markdown scratchpad with tags and pinning
 
 ## Tech Stack
 
-- **Framework**: Next.js 15+ (App Router)
+- **Framework**: Next.js 16 (App Router, Turbopack)
 - **Styling**: Tailwind CSS v4 + Framer Motion
 - **UI**: shadcn/ui components
-- **Database**: Supabase (Postgres)
-- **Auth**: Supabase Auth with GitHub OAuth
+- **Database**: Supabase (Postgres) - schema ready, not deployed
+- **Auth**: Supabase Auth with GitHub OAuth (not implemented yet)
 - **Animations**: tsParticles + Framer Motion
 
 ## Running Locally
@@ -59,15 +71,36 @@ Site runs on **http://localhost:3344**
 src/
 ├── app/
 │   ├── (public)/          # Public routes (/, /projects, /about)
-│   └── admin/             # Protected admin routes
+│   │   └── page.tsx       # Landing page with hero animation
+│   └── admin/             # Admin dashboard
+│       ├── page.tsx       # Dashboard home
+│       ├── projects/      # Projects CRUD
+│       ├── credentials/   # API keys vault
+│       ├── services/      # Port tracker
+│       ├── repos/         # GitHub links
+│       ├── logins/        # Password manager
+│       └── notes/         # Scratchpad
 ├── components/
 │   ├── particles/         # EntropyField, NebulaBackground, CrystallizeText
 │   ├── public/            # Navigation, ProjectCard
-│   └── admin/             # Sidebar, dashboard components
-└── lib/
-    └── supabase/          # Database client and types
+│   ├── admin/             # Sidebar, EntropyMeter
+│   └── ui/                # shadcn components
+├── lib/
+│   └── supabase/          # Database client and types
+└── supabase/
+    └── schema.sql         # Database schema (not yet deployed)
 ```
 
-## Current Session Context
+## Next Steps
 
-See [STATUS.md](../progress/STATUS.md) for the latest progress and next steps.
+1. **Deploy database**: Run `/supabase/schema.sql` in Supabase SQL Editor
+2. **Connect to real data**: Replace placeholder state with Supabase queries
+3. **Implement auth**: GitHub OAuth login page
+4. **Deploy**: Push to Vercel
+
+## Experimental Components (Not In Use)
+
+- `src/components/particles/ParticleLetter.tsx` - Particle animation forming letters
+- `src/components/particles/useLetterParticles.ts` - Canvas-based position extraction
+
+These were attempted but not polished. Can revisit later.

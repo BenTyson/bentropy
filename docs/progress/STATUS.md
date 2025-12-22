@@ -2,22 +2,22 @@
 
 > Last updated: December 2024
 
-## Current Phase: Foundation Complete, Admin CRUD Pending
+## Current Phase: Admin Dashboard Complete (Placeholder Data)
 
-The public site is functional with placeholder data. Admin dashboard layout is done but individual module pages need to be built.
+The public site and admin dashboard are both fully functional with placeholder data. Database schema is ready but not yet deployed to Supabase.
 
 ## Completed
 
 ### Phase 1: Foundation
 - [x] Next.js 15 project initialized with TypeScript
 - [x] Tailwind CSS v4 configured with Bentropy design system
-- [x] shadcn/ui installed (button, card, badge, input components)
+- [x] shadcn/ui installed (button, card, badge, input, textarea, dialog, select components)
 - [x] Supabase client configured (`.env.local` has credentials)
 - [x] Middleware for auth protection (graceful fallback when no DB)
 - [x] Project structure established
 
 ### Phase 2: Public Site
-- [x] Landing page with particle crystallization hero
+- [x] Landing page with CrystallizeText hero animation
 - [x] Nebula background with parallax and slow zoom
 - [x] Navigation component with active state indicators
 - [x] Projects grid page with filtering
@@ -25,17 +25,23 @@ The public site is functional with placeholder data. Admin dashboard layout is d
 - [x] About page with skills and philosophy
 - [x] Placeholder project data for all 7 projects
 
-### Phase 3: Admin Dashboard (Partial)
+### Phase 3: Admin Dashboard
 - [x] Admin layout with sidebar navigation
 - [x] Dashboard home page with stats and activity feed
 - [x] Entropy meter component
 - [x] Quick actions grid
-- [ ] Projects CRUD page
-- [ ] Credentials vault page
-- [ ] Local services page
-- [ ] Repositories page
-- [ ] Logins page
-- [ ] Notes page
+- [x] **Projects CRUD page** - Full create/edit/delete with dialog forms
+- [x] **Credentials vault page** - API key storage with show/hide, copy, expiration tracking
+- [x] **Local services page** - Port tracking with active status indicators
+- [x] **Repositories page** - GitHub links with clone command copy
+- [x] **Logins page** - Password manager with categories
+- [x] **Notes page** - Markdown scratchpad with tags, pinning, search
+
+### Database
+- [x] SQL schema created (`/supabase/schema.sql`)
+- [x] All 6 tables defined (projects, credentials, local_services, repositories, logins, notes)
+- [x] Seed data for 7 projects included
+- [ ] Schema not yet deployed to Supabase
 
 ### Documentation
 - [x] Docs folder structure created
@@ -44,24 +50,12 @@ The public site is functional with placeholder data. Admin dashboard layout is d
 - [x] Database schema documentation
 - [x] This status document
 
-## In Progress
-
-Nothing currently in progress.
-
 ## Not Started
 
-### Database
-- [ ] Run SQL to create tables in Supabase
+### Database Deployment
+- [ ] Run SQL to create tables in Supabase SQL Editor
 - [ ] Set up Row Level Security policies
-- [ ] Seed initial project data
-
-### Admin CRUD Pages
-- [ ] `/admin/projects` - Full CRUD with image upload
-- [ ] `/admin/credentials` - Encrypted key storage
-- [ ] `/admin/services` - Port tracking
-- [ ] `/admin/repos` - GitHub links
-- [ ] `/admin/logins` - Password manager
-- [ ] `/admin/notes` - Markdown scratchpad
+- [ ] Connect admin pages to real Supabase data (currently using placeholder state)
 
 ### Auth
 - [ ] Login page (`/login`)
@@ -75,11 +69,19 @@ Nothing currently in progress.
 - [ ] SEO optimization
 - [ ] Vercel deployment
 
+## Experimental (Not In Use)
+
+The following components were created but are not currently used:
+- `ParticleLetter.tsx` - Attempted particle animation for forming letters
+- `useLetterParticles.ts` - Hook for generating particle positions from canvas
+
+These can be revisited later if desired.
+
 ## Known Issues
 
 1. **Middleware deprecation warning**: Next.js 16 shows warning about middleware convention. Can be ignored for now, will need migration later.
 
-2. **Placeholder data**: All project data is hardcoded. Need to connect to Supabase.
+2. **Placeholder data**: All data in admin pages is local React state. Changes don't persist. Need to connect to Supabase.
 
 ## Development Server
 
@@ -91,7 +93,7 @@ Runs on **http://localhost:3344**
 
 ## Next Priority Tasks
 
-1. Create database tables in Supabase SQL Editor
-2. Build `/admin/projects` CRUD page
-3. Connect public site to real Supabase data
-4. Implement GitHub OAuth login
+1. **Deploy database**: Run `/supabase/schema.sql` in Supabase SQL Editor
+2. **Connect to real data**: Replace placeholder state with Supabase queries
+3. **Implement GitHub OAuth**: Add login page and protect admin routes
+4. **Deploy to Vercel**: Get it live
