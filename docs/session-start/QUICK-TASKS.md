@@ -6,7 +6,7 @@ Common tasks future agents might need to do.
 
 ```bash
 cd /Users/bentyson/bentropy
-npm run dev -- -p 3344
+npm run dev
 ```
 
 Site: http://localhost:3344

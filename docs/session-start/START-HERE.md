@@ -60,7 +60,7 @@ Welcome, agent. This document will get you up to speed on the Bentropy project.
 
 ```bash
 npm install
-npm run dev -- -p 3344
+npm run dev
 ```
 
 Site runs on **http://localhost:3344**

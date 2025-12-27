@@ -18,15 +18,28 @@ export function CrystallizeText({
 }: CrystallizeTextProps) {
   const controls = useAnimation();
   const [isVisible, setIsVisible] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
-  // Generate random positions for each letter once
+  // Generate random positions only on client after mount to avoid hydration mismatch
   const letterOffsets = useMemo(() => {
+    if (!isMounted) {
+      // Return consistent values for SSR and initial hydration
+      return text.split("").map(() => ({
+        y: 0,
+        x: 0,
+        rotate: 0,
+      }));
+    }
     return text.split("").map(() => ({
       y: Math.random() * 100 - 50,
       x: Math.random() * 100 - 50,
       rotate: Math.random() * 360,
     }));
-  }, [text]);
+  }, [text, isMounted]);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
