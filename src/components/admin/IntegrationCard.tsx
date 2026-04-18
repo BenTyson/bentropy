@@ -11,9 +11,10 @@ import {
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Integration, IntegrationType, SyncStatus } from "@/lib/db/types";
+import { refreshIntegration } from "@/lib/db/actions";
+import { RefreshButton } from "./RefreshButton";
 
 const typeMeta: Record<
   IntegrationType,
@@ -68,11 +69,20 @@ function configSummary(integration: Integration): string | null {
   }
 }
 
-export function IntegrationCard({ integration }: { integration: Integration }) {
+export function IntegrationCard({
+  integration,
+  projectSlug,
+}: {
+  integration: Integration;
+  projectSlug?: string;
+}) {
   const meta = typeMeta[integration.type];
   const Icon = meta.icon;
   const summary = configSummary(integration);
   const status = integration.sync_status;
+  const canRefresh = integration.type === "vercel" || integration.type === "railway";
+
+  const refreshAction = refreshIntegration.bind(null, integration.id, projectSlug);
 
   return (
     <Card>
@@ -102,9 +112,7 @@ export function IntegrationCard({ integration }: { integration: Integration }) {
             <Activity className="w-3 h-3" />
             {formatRelative(integration.last_synced_at)}
           </div>
-          <Button size="sm" variant="outline" disabled>
-            Refresh
-          </Button>
+          <RefreshButton action={refreshAction} disabled={!canRefresh} />
         </div>
         {integration.sync_error && (
           <p className="text-xs text-destructive line-clamp-2">

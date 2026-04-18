@@ -2,6 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { encrypt } from "@/lib/crypto";
+import { syncIntegrationById } from "@/lib/integrations/sync";
 import type {
   IntegrationConfigFor,
   IntegrationType,
@@ -120,7 +123,7 @@ export async function createCredential(input: CredentialInput) {
   const { error } = await supabase.from("credentials").insert({
     name: input.name,
     service: input.service,
-    key_encrypted: input.key,
+    key_encrypted: encrypt(input.key),
     project_id: nullable(input.project_id),
     expires_at: input.expires_at ? new Date(input.expires_at).toISOString() : null,
     notes: nullable(input.notes),
@@ -137,7 +140,7 @@ export async function updateCredential(id: string, input: CredentialInput) {
     .update({
       name: input.name,
       service: input.service,
-      key_encrypted: input.key,
+      key_encrypted: encrypt(input.key),
       project_id: nullable(input.project_id),
       expires_at: input.expires_at
         ? new Date(input.expires_at).toISOString()
@@ -280,8 +283,8 @@ export async function createLogin(input: LoginInput) {
   const supabase = await db();
   const { error } = await supabase.from("logins").insert({
     service: input.service,
-    username_encrypted: input.username,
-    password_encrypted: input.password,
+    username_encrypted: encrypt(input.username),
+    password_encrypted: encrypt(input.password),
     url: nullable(input.url),
     category: nullable(input.category),
     notes: nullable(input.notes),
@@ -297,8 +300,8 @@ export async function updateLogin(id: string, input: LoginInput) {
     .from("logins")
     .update({
       service: input.service,
-      username_encrypted: input.username,
-      password_encrypted: input.password,
+      username_encrypted: encrypt(input.username),
+      password_encrypted: encrypt(input.password),
       url: nullable(input.url),
       category: nullable(input.category),
       notes: nullable(input.notes),
@@ -410,4 +413,18 @@ export async function deleteIntegration(id: string, projectSlug?: string) {
   if (error) throw new Error(error.message);
   if (projectSlug) revalidatePath(`/admin/projects/${projectSlug}`);
   revalidatePath("/admin/integrations");
+}
+
+export async function refreshIntegration(
+  id: string,
+  projectSlug?: string,
+): Promise<{ status: "ok" | "error"; error?: string }> {
+  const supabase = createServiceClient();
+  const result = await syncIntegrationById(supabase, id);
+
+  if (projectSlug) revalidatePath(`/admin/projects/${projectSlug}`);
+  revalidatePath("/admin/integrations");
+  revalidatePath("/admin");
+
+  return { status: result.status, error: result.error };
 }

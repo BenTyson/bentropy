@@ -178,6 +178,15 @@ export interface IntegrationSnapshot {
   fetched_at: string;
 }
 
+export interface SyncLog {
+  id: string;
+  integration_id: string | null;
+  started_at: string;
+  finished_at: string | null;
+  status: "ok" | "error" | null;
+  error: string | null;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -224,6 +233,11 @@ export interface Database {
         Row: IntegrationSnapshot;
         Insert: Omit<IntegrationSnapshot, "id" | "fetched_at">;
         Update: Partial<Omit<IntegrationSnapshot, "id">>;
+      };
+      sync_log: {
+        Row: SyncLog;
+        Insert: Partial<Omit<SyncLog, "id">> & { integration_id: string | null };
+        Update: Partial<Omit<SyncLog, "id">>;
       };
     };
   };

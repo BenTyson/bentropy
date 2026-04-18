@@ -1,0 +1,37 @@
+# Railway service config for Bentropy web (Next.js)
+#
+# Two services live in the Bentropy Railway project: the web app (this file)
+# and the MCP server (mcp/railway.toml, added in M4 Session B). Both pull
+# env vars (NEXT_PUBLIC_SUPABASE_*, SUPABASE_SERVICE_ROLE_KEY, ENCRYPTION_KEY,
+# CRON_SECRET) from the Railway project-level secrets panel.
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm run start"
+healthcheckPath = "/"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# ----------------------------------------------------------------------------
+# Cron jobs
+# ----------------------------------------------------------------------------
+# Railway cron uses standard 5-field UNIX cron syntax (min hour dom mon dow),
+# evaluated in UTC. That's different from Vercel Cron, which takes the same
+# syntax but exposes its own timezone controls. Keep both jobs on a 15-min
+# cadence; each hits the app's own public URL with the Bearer CRON_SECRET
+# header so the route handlers can auth.
+#
+# RAILWAY_PUBLIC_DOMAIN is injected by Railway at runtime. CRON_SECRET must
+# be set in Railway project variables before the first cron fires.
+
+[[cron]]
+name = "sync-vercel"
+schedule = "*/15 * * * *"
+command = "curl -fsS -X POST -H \"Authorization: Bearer $CRON_SECRET\" \"https://$RAILWAY_PUBLIC_DOMAIN/api/cron/sync-vercel\""
+
+[[cron]]
+name = "sync-railway"
+schedule = "*/15 * * * *"
+command = "curl -fsS -X POST -H \"Authorization: Bearer $CRON_SECRET\" \"https://$RAILWAY_PUBLIC_DOMAIN/api/cron/sync-railway\""
