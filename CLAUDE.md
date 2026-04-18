@@ -13,7 +13,8 @@ Bentropy is Ben's master control hub for 10+ personal side projects. It centrali
 - Next.js 16 App Router (Turbopack) + React 19 + TypeScript 5
 - Tailwind v4 + shadcn/ui (locally copied) + Framer Motion + Lucide icons
 - Supabase (Postgres) + Supabase Auth (GitHub OAuth)
-- Deploy: Vercel (web) + Railway (MCP server, long-running process)
+- Deploy: **Railway** hosts both the web app and the MCP server (separate services in the same Railway project). Env vars (`NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`, `ENCRYPTION_KEY`) are configured in Railway, not Vercel.
+- **"Vercel" inside the hub** refers to an *integration type* — pilot projects like Finch and SaltGoat themselves deploy to Vercel, and the hub syncs their deploy/domain status. That's orthogonal to where bentropy runs.
 
 ## Conventions
 

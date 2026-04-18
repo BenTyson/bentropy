@@ -30,6 +30,19 @@ Record of key architectural and design decisions.
 
 ---
 
+## 2026-04-18: Bentropy hosts on Railway, not Vercel
+
+**Context**: The original plan doc and an earlier CLAUDE.md draft implied bentropy's web app would deploy to Vercel. It does not — both the web app and the MCP server run as separate services on Railway (same Railway project).
+
+**Important distinction**: The hub tracks "Vercel" as one of its 8 *integration types* because many pilot projects (Finch, SaltGoat, others) themselves deploy to Vercel. So "Vercel" inside the UI/schema is about what the hub observes, not where the hub itself runs.
+
+**Implications**:
+- Env vars (`NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`, `ENCRYPTION_KEY`, OAuth callback URLs) go in Railway, not Vercel.
+- M4's sync cron needs Railway's cron feature (`railway.toml` `[cron]`), not Vercel Cron. The HTTP handler (`/api/cron/sync-vercel`) is unchanged — only the scheduler.
+- Don't conflate: a credential with `service = 'vercel'` in the hub is a PAT used to call the Vercel API for a pilot project; it is not bentropy's own deploy token.
+
+---
+
 ## 2026-04-17: Running ad-hoc SQL against the remote DB
 
 **Context**: Seeding Finch + SaltGoat during M2 required running `supabase/seed.sql` against the live Bentropy project. Supabase CLI v2.72 has no `db seed` command; the Postgres password isn't stored in `.env.local`.
