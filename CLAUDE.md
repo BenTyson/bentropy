@@ -71,3 +71,29 @@ After shipping a milestone, update `CURRENT-STATUS.md` with the new state so the
 ## Build must pass
 
 Run `npm run build` before considering work complete. Fix what you break.
+
+## Supabase CLI + running SQL on the remote DB
+
+**CLI auth is global, not per-project.** Credentials live in the macOS keychain under service `"Supabase CLI"`, account `"supabase"`, base64-encoded with a `go-keyring-base64:` prefix. `~/.supabase/access-token` does *not* exist. Don't assume unauthenticated just because the file is missing — run `supabase projects list` to verify.
+
+**Worktrees need to be linked separately.** `supabase/config.toml` only stores `project_id` (local alias); the remote link isn't inherited from the main repo. If a CLI command says "Cannot find project ref. Have you run supabase link?", run:
+```bash
+supabase link --project-ref cbsydtnaxancoltzzhrz
+```
+
+**Running arbitrary SQL (seeds, one-off queries) against the live DB.** There's no `supabase db seed` in CLI v2.72, and the direct Postgres password isn't in `.env.local`. Use the Management API:
+
+```bash
+RAW=$(security find-generic-password -s "Supabase CLI" -a "supabase" -w)
+ACCESS_TOKEN=$(echo "${RAW#go-keyring-base64:}" | base64 -d)
+
+BODY=$(python3 -c 'import json; print(json.dumps({"query": open("supabase/seed.sql").read()}))')
+
+curl -s -X POST \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "$BODY" \
+  "https://api.supabase.com/v1/projects/cbsydtnaxancoltzzhrz/database/query"
+```
+
+HTTP 201 = success. Runs as postgres superuser (bypasses RLS). Use for seeds, ad-hoc verification queries, data fixes — anything that isn't a migration. For schema changes, keep using `supabase db push` with migration files.

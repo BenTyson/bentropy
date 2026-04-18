@@ -30,6 +30,23 @@ Record of key architectural and design decisions.
 
 ---
 
+## 2026-04-17: Running ad-hoc SQL against the remote DB
+
+**Context**: Seeding Finch + SaltGoat during M2 required running `supabase/seed.sql` against the live Bentropy project. Supabase CLI v2.72 has no `db seed` command; the Postgres password isn't stored in `.env.local`.
+
+**Options**:
+1. Wrap seed as a timestamped migration in `supabase/migrations/` and `supabase db push` — pollutes migration history for non-schema data
+2. `psql` with the Postgres URL — requires DB password we don't have cached
+3. Supabase Management API `/v1/projects/{ref}/database/query` — auth via the sbp_ token in macOS keychain
+
+**Decision**: Management API for seeds and one-off queries; keep `supabase db push` reserved for schema migrations.
+
+**Rationale**: Keeps migration history clean (only schema changes get recorded), bypasses RLS (runs as postgres superuser), and works from any worktree once linked. The CLI's keychain token is already present — no extra secret to manage.
+
+**Gotcha worth remembering**: Supabase CLI credentials are stored in the macOS keychain (service `"Supabase CLI"`, account `"supabase"`, base64-encoded with `go-keyring-base64:` prefix), NOT in `~/.supabase/access-token`. The file-not-found check is misleading. Use `supabase projects list` to actually verify auth. See CLAUDE.md for the full recipe.
+
+---
+
 ### Decision: Tailwind CSS v4
 **Context**: Styling system choice.
 **Options**: Tailwind v3, Tailwind v4, CSS Modules, styled-components

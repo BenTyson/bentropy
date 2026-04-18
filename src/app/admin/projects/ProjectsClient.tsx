@@ -29,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import Link from "next/link";
 import {
   Plus,
   Pencil,
@@ -36,6 +37,7 @@ import {
   ExternalLink,
   Github,
   Star,
+  Eye,
 } from "lucide-react";
 import type { Project, ProjectStatus } from "@/lib/db/types";
 import {
@@ -460,6 +462,11 @@ export function ProjectsClient({ initial }: { initial: Project[] }) {
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-2">
+                    <Link href={`/admin/projects/${project.slug}`}>
+                      <Button variant="ghost" size="icon">
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </Link>
                     <Button
                       variant="ghost"
                       size="icon"

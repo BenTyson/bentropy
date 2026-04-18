@@ -9,6 +9,60 @@ import type {
   Repository,
 } from "./types";
 
+export interface ProjectRollup {
+  project: Project;
+  credentials: Credential[];
+  repositories: Repository[];
+  localServices: LocalService[];
+  notes: Note[];
+}
+
+export async function getProjectBySlug(
+  slug: string,
+): Promise<ProjectRollup | null> {
+  const supabase = await createClient();
+
+  const { data: project, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("slug", slug)
+    .single();
+
+  if (error || !project) return null;
+
+  const [credentials, repositories, localServices, notes] = await Promise.all([
+    supabase
+      .from("credentials")
+      .select("*")
+      .eq("project_id", project.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("repositories")
+      .select("*")
+      .eq("project_id", project.id)
+      .order("name", { ascending: true }),
+    supabase
+      .from("local_services")
+      .select("*")
+      .eq("project_id", project.id)
+      .order("port", { ascending: true }),
+    supabase
+      .from("notes")
+      .select("*")
+      .eq("project_id", project.id)
+      .order("pinned", { ascending: false })
+      .order("updated_at", { ascending: false }),
+  ]);
+
+  return {
+    project: project as Project,
+    credentials: (credentials.data ?? []) as Credential[],
+    repositories: (repositories.data ?? []) as Repository[],
+    localServices: (localServices.data ?? []) as LocalService[],
+    notes: (notes.data ?? []) as Note[],
+  };
+}
+
 export async function getProjects(): Promise<Project[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
