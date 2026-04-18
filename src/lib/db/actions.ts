@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { ProjectStatus } from "./types";
+import type {
+  IntegrationConfigFor,
+  IntegrationType,
+  ProjectStatus,
+} from "./types";
 
 async function db() {
   return createClient();
@@ -363,4 +367,47 @@ export async function toggleNotePinned(id: string, pinned: boolean) {
     .eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/admin/notes");
+}
+
+// ===== Integrations =====
+
+export interface IntegrationInput<T extends IntegrationType = IntegrationType> {
+  project_id: string;
+  type: T;
+  display_name?: string | null;
+  config: IntegrationConfigFor<T>;
+  secret_ref?: string | null;
+}
+
+export async function createIntegration(input: IntegrationInput) {
+  const supabase = await db();
+
+  const { data: project, error: projErr } = await supabase
+    .from("projects")
+    .select("id, slug")
+    .eq("id", input.project_id)
+    .single();
+  if (projErr || !project) {
+    throw new Error("Project not found");
+  }
+
+  const { error } = await supabase.from("integrations").insert({
+    project_id: input.project_id,
+    type: input.type,
+    display_name: nullable(input.display_name),
+    config: input.config,
+    secret_ref: nullable(input.secret_ref),
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath(`/admin/projects/${project.slug}`);
+  revalidatePath("/admin/integrations");
+  revalidatePath("/admin");
+}
+
+export async function deleteIntegration(id: string, projectSlug?: string) {
+  const supabase = await db();
+  const { error } = await supabase.from("integrations").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  if (projectSlug) revalidatePath(`/admin/projects/${projectSlug}`);
+  revalidatePath("/admin/integrations");
 }

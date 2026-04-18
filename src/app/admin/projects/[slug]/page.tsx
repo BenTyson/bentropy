@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Key, Server, GitBranch, FileText, Plug, ExternalLink, Github } from "lucide-react";
+import { ArrowLeft, Key, Server, GitBranch, FileText, Plug, Plus, ExternalLink, Github } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { IntegrationCard } from "@/components/admin/IntegrationCard";
 import { getProjectBySlug } from "@/lib/db/queries";
 import type { ProjectStatus } from "@/lib/db/types";
 
@@ -23,7 +25,7 @@ export default async function ProjectDetailPage({
   const rollup = await getProjectBySlug(slug);
   if (!rollup) notFound();
 
-  const { project, credentials, repositories, localServices, notes } = rollup;
+  const { project, credentials, repositories, localServices, notes, integrations } = rollup;
 
   return (
     <div className="space-y-6">
@@ -103,18 +105,34 @@ export default async function ProjectDetailPage({
         </CardContent>
       </Card>
 
-      {/* Card 2: Integrations placeholder */}
+      {/* Card 2: Integrations */}
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Plug className="w-4 h-4 text-muted-foreground" />
-            <CardTitle>Integrations</CardTitle>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Plug className="w-4 h-4 text-muted-foreground" />
+              <CardTitle>Integrations</CardTitle>
+            </div>
+            <Link href={`/admin/projects/${project.slug}/integrations/new`}>
+              <Button size="sm" variant="outline">
+                <Plus className="w-4 h-4 mr-1" />
+                Add integration
+              </Button>
+            </Link>
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Coming in M3 — connect Vercel, GitHub, Supabase, Stripe, Railway, DNS.
-          </p>
+          {integrations.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No integrations yet. Add one to start tracking live status.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {integrations.map((integration) => (
+                <IntegrationCard key={integration.id} integration={integration} />
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

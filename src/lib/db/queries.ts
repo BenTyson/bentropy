@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Credential,
+  Integration,
   LocalService,
   Login,
   Note,
@@ -15,6 +16,7 @@ export interface ProjectRollup {
   repositories: Repository[];
   localServices: LocalService[];
   notes: Note[];
+  integrations: Integration[];
 }
 
 export async function getProjectBySlug(
@@ -30,29 +32,35 @@ export async function getProjectBySlug(
 
   if (error || !project) return null;
 
-  const [credentials, repositories, localServices, notes] = await Promise.all([
-    supabase
-      .from("credentials")
-      .select("*")
-      .eq("project_id", project.id)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("repositories")
-      .select("*")
-      .eq("project_id", project.id)
-      .order("name", { ascending: true }),
-    supabase
-      .from("local_services")
-      .select("*")
-      .eq("project_id", project.id)
-      .order("port", { ascending: true }),
-    supabase
-      .from("notes")
-      .select("*")
-      .eq("project_id", project.id)
-      .order("pinned", { ascending: false })
-      .order("updated_at", { ascending: false }),
-  ]);
+  const [credentials, repositories, localServices, notes, integrations] =
+    await Promise.all([
+      supabase
+        .from("credentials")
+        .select("*")
+        .eq("project_id", project.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("repositories")
+        .select("*")
+        .eq("project_id", project.id)
+        .order("name", { ascending: true }),
+      supabase
+        .from("local_services")
+        .select("*")
+        .eq("project_id", project.id)
+        .order("port", { ascending: true }),
+      supabase
+        .from("notes")
+        .select("*")
+        .eq("project_id", project.id)
+        .order("pinned", { ascending: false })
+        .order("updated_at", { ascending: false }),
+      supabase
+        .from("integrations")
+        .select("*")
+        .eq("project_id", project.id)
+        .order("type", { ascending: true }),
+    ]);
 
   return {
     project: project as Project,
@@ -60,7 +68,29 @@ export async function getProjectBySlug(
     repositories: (repositories.data ?? []) as Repository[],
     localServices: (localServices.data ?? []) as LocalService[],
     notes: (notes.data ?? []) as Note[],
+    integrations: (integrations.data ?? []) as Integration[],
   };
+}
+
+export async function getAllIntegrations(): Promise<
+  (Integration & { project_name: string | null; project_slug: string | null })[]
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("integrations")
+    .select("*, projects(name, slug)")
+    .order("type", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((row) => {
+    const { projects, ...rest } = row as Integration & {
+      projects: { name: string; slug: string } | null;
+    };
+    return {
+      ...rest,
+      project_name: projects?.name ?? null,
+      project_slug: projects?.slug ?? null,
+    };
+  });
 }
 
 export async function getProjects(): Promise<Project[]> {

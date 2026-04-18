@@ -92,19 +92,83 @@ export type IntegrationType =
   | "analytics"
   | "local";
 
-export interface Integration {
+export type SyncStatus = "ok" | "stale" | "error";
+
+export interface VercelConfig {
+  vercel_project_id: string;
+  team_id?: string | null;
+}
+
+export interface GithubConfig {
+  owner: string;
+  repo: string;
+}
+
+export interface SupabaseConfig {
+  project_ref: string;
+}
+
+export interface StripeConfig {
+  account_id: string;
+}
+
+export interface RailwayConfig {
+  service_id: string;
+  environment_id: string;
+}
+
+export interface DnsConfig {
+  provider: string;
+  zone_id: string;
+}
+
+export interface AnalyticsConfig {
+  provider: string;
+  property_id: string;
+}
+
+export interface LocalIntegrationConfig {
+  port: number;
+  start_command?: string | null;
+}
+
+export type IntegrationConfigFor<T extends IntegrationType> =
+  T extends "vercel"
+    ? VercelConfig
+    : T extends "github"
+      ? GithubConfig
+      : T extends "supabase"
+        ? SupabaseConfig
+        : T extends "stripe"
+          ? StripeConfig
+          : T extends "railway"
+            ? RailwayConfig
+            : T extends "dns"
+              ? DnsConfig
+              : T extends "analytics"
+                ? AnalyticsConfig
+                : T extends "local"
+                  ? LocalIntegrationConfig
+                  : never;
+
+type BaseIntegration = {
   id: string;
   project_id: string;
-  type: IntegrationType;
   display_name: string | null;
-  config: Record<string, unknown>;
   secret_ref: string | null;
   last_synced_at: string | null;
-  sync_status: "ok" | "stale" | "error" | null;
+  sync_status: SyncStatus | null;
   sync_error: string | null;
   created_at: string;
   updated_at: string;
-}
+};
+
+export type Integration = {
+  [T in IntegrationType]: BaseIntegration & {
+    type: T;
+    config: IntegrationConfigFor<T>;
+  };
+}[IntegrationType];
 
 export interface IntegrationSnapshot {
   id: string;

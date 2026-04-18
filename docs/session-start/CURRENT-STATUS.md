@@ -1,77 +1,67 @@
 # Current Status
 
-**Last update:** 2026-04-17 (M2 complete)
+**Last update:** 2026-04-18 (M3 complete)
 
 ## What's done
 
+### M3 — Integrations schema + manual Vercel rows (complete)
+
+- **Crypto** ([src/lib/crypto.ts](../../src/lib/crypto.ts)) — AES-256-GCM `encrypt`/`decrypt`. Payload format: base64 of `iv(12) || ciphertext || tag(16)`. Key loaded from `ENCRYPTION_KEY` env var (base64-encoded 32-byte key). `"server-only"` guard. `isEncryptedPayload()` helper skips placeholder strings.
+
+- **Types** ([src/lib/db/types.ts](../../src/lib/db/types.ts)) — `Integration` is now a discriminated union keyed on `type`, with `config` typed per-type: `vercel`, `github`, `supabase`, `stripe`, `railway`, `dns`, `analytics`, `local`. `IntegrationConfigFor<T>` maps type → config shape.
+
+- **IntegrationCard** ([src/components/admin/IntegrationCard.tsx](../../src/components/admin/IntegrationCard.tsx)) — server component; switches on `integration.type` to pick icon + config summary. Shows display_name, sync_status badge (falls back to `pending` when null), relative `last_synced_at`, disabled "Refresh" placeholder, and sync_error line if set.
+
+- **Detail page grid** ([src/app/admin/projects/[slug]/page.tsx](../../src/app/admin/projects/%5Bslug%5D/page.tsx)) — Card 2 is now a live integrations grid (1/2/3 cols responsive) with an "Add integration" button linking to the new page. Placeholder copy gone.
+
+- **New integration flow** ([src/app/admin/projects/[slug]/integrations/new/page.tsx](../../src/app/admin/projects/%5Bslug%5D/integrations/new/page.tsx) + [NewIntegrationForm.tsx](../../src/app/admin/projects/%5Bslug%5D/integrations/new/NewIntegrationForm.tsx)) — server shell loads project; client form has type selector + conditional config fields that match the discriminated union. Submits via `createIntegration` server action, redirects to detail page on success.
+
+- **Server action** ([src/lib/db/actions.ts](../../src/lib/db/actions.ts)) — `createIntegration(input)` validates project exists, inserts row, revalidates detail + listing. Also `deleteIntegration(id, projectSlug?)`.
+
+- **Queries** ([src/lib/db/queries.ts](../../src/lib/db/queries.ts)) — `getProjectBySlug` now returns `integrations` in the rollup. New `getAllIntegrations()` joins project name/slug for the listing page.
+
+- **Nav** ([src/components/admin/Sidebar.tsx](../../src/components/admin/Sidebar.tsx)) — added "Integrations" item (Plug icon) between Projects and Credentials.
+
+- **Listing page** ([src/app/admin/integrations/page.tsx](../../src/app/admin/integrations/page.tsx)) — groups all integrations by project. Was needed for the sidebar link to land somewhere sane.
+
+- **Manual Vercel rows seeded** for Finch + SaltGoat with `vercel_project_id = prj_placeholder_*`. `display_name = "Production"`. `sync_status = null` → card renders "pending" badge + "Never synced". Unique index `(project_id, type, display_name)` enforced; seed uses `on conflict ... do update` so re-runs are safe.
+
+- **Docs** ([docs/encryption.md](../encryption.md)) — full writeup of key format, where to set it (Railway, not Vercel), payload format, rotation procedure, and the `PLACEHOLDER_*` seed problem.
+
+- **Build verified**: `npm run build` clean. New routes `/admin/integrations` and `/admin/projects/[slug]/integrations/new` registered.
+
 ### M2 — Per-project detail page + Finch/SaltGoat seed (complete)
-
-- **Detail page** ([src/app/admin/projects/[slug]/page.tsx](../../src/app/admin/projects/%5Bslug%5D/page.tsx)) — server component, 6 stacked cards:
-  1. Hero — name, tagline, status badge, links (primary_domain, demo_url, repo_url), tech stack, description, timestamps
-  2. Integrations — placeholder, "Coming in M3"
-  3. Credentials — masked keys (••••••••), expiry badge if set, service + notes
-  4. Repositories — name, category, external GitHub link
-  5. Local Dev — port, start_command, running/stopped badge
-  6. Notes — title, content, pinned badge, tags
-
-- **Projects list link** ([src/app/admin/projects/ProjectsClient.tsx](../../src/app/admin/projects/ProjectsClient.tsx)) — Eye icon button on each row links to `/admin/projects/[slug]`
-
-- **Query** ([src/lib/db/queries.ts](../../src/lib/db/queries.ts)) — `getProjectBySlug(slug)` + `ProjectRollup` type; loads project + credentials, repos, local_services, notes in parallel
-
-- **Seed** ([supabase/seed.sql](../../supabase/seed.sql)) — idempotent DO block; upserts Finch + SaltGoat projects then delete+reinserts their credentials, repos, local services, and notes. Run via Supabase SQL editor (runs as service-role, bypasses RLS).
-
-- **Build verified**: `npm run build` clean. `/admin/projects/[slug]` correctly listed as dynamic (ƒ).
-
 ### M1 — DB + admin wired (complete)
 
-- **Schema** — applied live to Bentropy Supabase project (`cbsydtnaxancoltzzhrz`) via `supabase db push`
-  - Migration: [supabase/migrations/20260418023308_init_hub_schema.sql](../../supabase/migrations/20260418023308_init_hub_schema.sql)
-  - Original 6 tables plus: `admin_users`, `integrations`, `integration_snapshots`, `sync_log`
-  - `projects` extended with `primary_domain`, `vercel_project_id`, `archived_at`
-  - `updated_at` triggers on every mutable table
-  - RLS tightened: `is_admin()` allowlist gates everything; `projects` keeps public SELECT for marketing site
-  - CLI initialized + linked: [supabase/config.toml](../../supabase/config.toml). New migrations go in [supabase/migrations/](../../supabase/migrations/). Apply with `supabase db push`.
+(see git history; unchanged by M3)
 
-- **Types** ([src/lib/db/types.ts](../../src/lib/db/types.ts)) — single source; old `src/lib/supabase/types.ts` re-exports for backward compat
+## What Ben needs to do before M3 is fully live
 
-- **Queries** ([src/lib/db/queries.ts](../../src/lib/db/queries.ts)) — `server-only` helpers used by RSC pages
+1. **Generate and set `ENCRYPTION_KEY`**:
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+   ```
+   - Add to local `.env.local` (uncomment the existing line).
+   - Add to **Railway** env vars — both the web app and MCP services in the bentropy Railway project. **Not Vercel.** Bentropy runs on Railway; the "Vercel" integration type is about pilot projects.
 
-- **Server actions** ([src/lib/db/actions.ts](../../src/lib/db/actions.ts)) — all admin mutations, `revalidatePath` after writes
+2. **Replace the `PLACEHOLDER_*` credential strings** from M2. Finch has 5, SaltGoat has 1. Go to `/admin/credentials`, edit each, paste real keys. The update flow still writes raw strings today — we need to wire `encrypt()` into [src/lib/db/actions.ts](../../src/lib/db/actions.ts) `createCredential`/`updateCredential` before those real keys land. **Flagged for a follow-up task**; M3 scope ended at the integration flow.
 
-- **Admin pages** — all 7 wired to Supabase (server component shell + client form + server actions):
-  - Dashboard, Projects, Credentials, Services, Repos, Logins, Notes
+3. **Replace the `prj_placeholder_*` Vercel integration configs** with real Vercel project IDs via `/admin/projects/finch` → Integrations → edit (no edit UI yet — for now re-enter via "Add integration" after deleting the placeholder, or SQL it). M4 live sync needs real IDs to work.
 
-- **Auth gate** — admin layout redirects to `/login` if unauthenticated or not in `admin_users`; GitHub OAuth flow complete
+## Known follow-ups (not in M3 scope)
 
-## Seed data applied
-
-Seeded via Management API on 2026-04-17. Verified row counts:
-- `finch` (active): 5 creds, 2 repos, 1 service, 2 notes
-- `saltgoat` (concept): 1 cred, 1 repo, 1 service, 1 note
-
-Visit `/admin/projects` → Eye icon on Finch/SaltGoat to see the detail page. Replace `PLACEHOLDER_*` credential values with real keys before M3 (when encryption is wired in).
-
-### How the seed was run (for future reference)
-
-Supabase CLI v2.72 has no `db seed`, and the Postgres password isn't cached. Used the Management API `/database/query` endpoint with the `sbp_` access token from the macOS keychain. Full recipe + gotchas in [CLAUDE.md](../../CLAUDE.md#supabase-cli--running-sql-on-the-remote-db); decision rationale in [docs/decisions/LOG.md](../decisions/LOG.md).
-
-## What Ben needed to do to ship M1 (still applies for Vercel deploy)
-
-These deploy steps haven't changed — see the previous session notes if needed.
-
-## Known follow-ups (not in M1/M2 scope)
-
-- `middleware.ts` shows a Next 16 deprecation warning ("use 'proxy' instead"). Cosmetic; not a blocker.
-- `Github` icon from lucide-react shows deprecation warnings. Still renders; cosmetic.
-- Public site `(public)/projects/[slug]` still uses hardcoded placeholder data — left alone per "don't touch the marketing site" rule.
-- Credentials stored as plaintext until `ENCRYPTION_KEY` env var + AES-GCM encrypt/decrypt helper wired in (M3 work).
+- **Credential encrypt/decrypt wiring**: `createCredential`/`updateCredential`/`createLogin`/`updateLogin` still write plaintext. Wire `encrypt()` before any real secret is entered. See [docs/encryption.md](../encryption.md).
+- **Integration edit flow**: Only create + delete are wired. Editing means delete + recreate today.
+- **Deprecated `Github` icon + `middleware.ts` warnings** from lucide / Next 16: cosmetic, unchanged from M2.
+- **Integration card "Refresh" button** is disabled — placeholder until M4 cron.
 
 ## What's next
 
-**M3** — Integrations schema + manual Vercel rows. See [active plan](/Users/bentyson/.claude/plans/bentropy-is-the-master-lexical-snowglobe.md) M3 section. Use **Opus 4.7** (polymorphic schema design + discriminated union types). Start a fresh session.
+**M4** — Vercel live sync + MCP server skeleton. See [active plan](/Users/bentyson/.claude/plans/bentropy-is-the-master-lexical-snowglobe.md) M4 section. Use **Opus 4.7**. **Split into 2 sessions** (non-negotiable per plan):
 
-Key M3 tasks:
-- Migrate `integrations` + `integration_snapshots` + `sync_log` tables (already exist in schema, but the `IntegrationCard` component and the `/admin/projects/[slug]/integrations/new` flow need building)
-- Build generic `IntegrationCard` component
-- Manually enter Vercel project IDs + PATs for Finch + SaltGoat
-- Wire `ENCRYPTION_KEY` env var + `src/lib/crypto.ts` AES-GCM helpers before inserting first real credential
+- **Session A**: `/api/cron/sync-vercel` HTTP handler + Vercel API client + `integration_snapshots` upsert + `sync_status`/`last_synced_at` update + Refresh button wired.
+- **Session B**: `mcp/` package skeleton + 4 read tools (`list_projects`, `get_project`, `list_integrations`, `get_credential`) + Railway deploy + Claude Code mcpServers entry.
+
+**Important for M4**: the sync cron must use **Railway cron** (`railway.toml` `[cron]`), not Vercel Cron. Bentropy runs on Railway. The HTTP handler itself is unchanged — only the scheduler. See [docs/decisions/LOG.md](../decisions/LOG.md) 2026-04-18.
+
+Before starting M4, do the two Ben-action items above (`ENCRYPTION_KEY` set in Railway, real Vercel project IDs entered).
