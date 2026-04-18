@@ -113,6 +113,7 @@ export interface StripeConfig {
 }
 
 export interface RailwayConfig {
+  project_id: string;
   service_id: string;
   environment_id: string;
 }

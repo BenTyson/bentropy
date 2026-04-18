@@ -24,7 +24,11 @@
 
 - **Listing page** ([src/app/admin/integrations/page.tsx](../../src/app/admin/integrations/page.tsx)) — groups all integrations by project. Was needed for the sidebar link to land somewhere sane.
 
-- **Manual Vercel rows seeded** for Finch + SaltGoat with `vercel_project_id = prj_placeholder_*`. `display_name = "Production"`. `sync_status = null` → card renders "pending" badge + "Never synced". Unique index `(project_id, type, display_name)` enforced; seed uses `on conflict ... do update` so re-runs are safe.
+- **Manual integration rows seeded**. Pilot hosts differ — verified against `/Users/bentyson/finch` (has `vercel.json`, hosted on Vercel) and `/Users/bentyson/saltgoat` (has `railway.toml`, Railway project `00b2ac99-...`):
+  - **Finch → Vercel** integration (`vercel_project_id = prj_placeholder_finch`, display_name "Production")
+  - **SaltGoat → Railway** integration (`project_id = 00b2ac99-4a09-4959-992f-169c7f981b96`, `service_id` + `environment_id` empty, display_name "Production")
+  - `sync_status = null` on both → cards render "pending" + "Never synced". Unique index `(project_id, type, display_name)` enforced; seed uses `on conflict ... do update`.
+- **RailwayConfig** now includes `project_id` (Railway's project UUID) alongside `service_id` + `environment_id` — needed for any Railway API call.
 
 - **Docs** ([docs/encryption.md](../encryption.md)) — full writeup of key format, where to set it (Railway, not Vercel), payload format, rotation procedure, and the `PLACEHOLDER_*` seed problem.
 
@@ -57,11 +61,11 @@
 
 ## What's next
 
-**M4** — Vercel live sync + MCP server skeleton. See [active plan](/Users/bentyson/.claude/plans/bentropy-is-the-master-lexical-snowglobe.md) M4 section. Use **Opus 4.7**. **Split into 2 sessions** (non-negotiable per plan):
+**M4** — Live sync (both Vercel + Railway) + MCP server skeleton. See [active plan](/Users/bentyson/.claude/plans/bentropy-is-the-master-lexical-snowglobe.md) M4 section. Use **Opus 4.7**. **Split into 2 sessions** (non-negotiable per plan):
 
-- **Session A**: `/api/cron/sync-vercel` HTTP handler + Vercel API client + `integration_snapshots` upsert + `sync_status`/`last_synced_at` update + Refresh button wired.
+- **Session A**: HTTP handlers + API clients for both integration types we have live pilot rows for today — Vercel (Finch) and Railway (SaltGoat). `/api/cron/sync-vercel` + `src/lib/integrations/vercel.ts`, and `/api/cron/sync-railway` + `src/lib/integrations/railway.ts`. Both upsert `integration_snapshots`, update `sync_status`/`last_synced_at`, feed the "Refresh" button.
 - **Session B**: `mcp/` package skeleton + 4 read tools (`list_projects`, `get_project`, `list_integrations`, `get_credential`) + Railway deploy + Claude Code mcpServers entry.
 
-**Important for M4**: the sync cron must use **Railway cron** (`railway.toml` `[cron]`), not Vercel Cron. Bentropy runs on Railway. The HTTP handler itself is unchanged — only the scheduler. See [docs/decisions/LOG.md](../decisions/LOG.md) 2026-04-18.
+**Important for M4**: the sync cron itself must use **Railway cron** (`railway.toml` `[cron]`), not Vercel Cron. Bentropy runs on Railway regardless of what it's syncing. See [docs/decisions/LOG.md](../decisions/LOG.md) 2026-04-18.
 
-Before starting M4, do the two Ben-action items above (`ENCRYPTION_KEY` set in Railway, real Vercel project IDs entered).
+Before starting M4, do the Ben-action items above (`ENCRYPTION_KEY` set in Railway, real pilot deploy IDs entered).

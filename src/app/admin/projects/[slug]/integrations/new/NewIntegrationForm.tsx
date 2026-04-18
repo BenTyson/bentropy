@@ -38,6 +38,7 @@ type FormState = {
   // stripe
   account_id: string;
   // railway
+  railway_project_id: string;
   service_id: string;
   environment_id: string;
   // dns / analytics
@@ -57,6 +58,7 @@ const emptyForm: FormState = {
   repo: "",
   project_ref: "",
   account_id: "",
+  railway_project_id: "",
   service_id: "",
   environment_id: "",
   provider: "",
@@ -110,6 +112,7 @@ function buildInput(
         type,
         display_name,
         config: {
+          project_id: form.railway_project_id.trim(),
           service_id: form.service_id.trim(),
           environment_id: form.environment_id.trim(),
         },
@@ -157,9 +160,11 @@ function validate(type: IntegrationType, form: FormState): string | null {
     case "stripe":
       return form.account_id.trim() ? null : "Account ID is required";
     case "railway":
-      return form.service_id.trim() && form.environment_id.trim()
+      return form.railway_project_id.trim() &&
+        form.service_id.trim() &&
+        form.environment_id.trim()
         ? null
-        : "Service ID and environment ID are required";
+        : "Project ID, service ID, and environment ID are required";
     case "dns":
       return form.provider.trim() && form.zone_id.trim()
         ? null
@@ -299,20 +304,29 @@ export function NewIntegrationForm({
       )}
 
       {type === "railway" && (
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Service ID">
+        <>
+          <Field label="Railway project ID">
             <Input
-              value={form.service_id}
-              onChange={(e) => update("service_id", e.target.value)}
+              value={form.railway_project_id}
+              onChange={(e) => update("railway_project_id", e.target.value)}
+              placeholder="00b2ac99-..."
             />
           </Field>
-          <Field label="Environment ID">
-            <Input
-              value={form.environment_id}
-              onChange={(e) => update("environment_id", e.target.value)}
-            />
-          </Field>
-        </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Service ID">
+              <Input
+                value={form.service_id}
+                onChange={(e) => update("service_id", e.target.value)}
+              />
+            </Field>
+            <Field label="Environment ID">
+              <Input
+                value={form.environment_id}
+                onChange={(e) => update("environment_id", e.target.value)}
+              />
+            </Field>
+          </div>
+        </>
       )}
 
       {type === "dns" && (

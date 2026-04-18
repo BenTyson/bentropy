@@ -58,7 +58,7 @@ function configSummary(integration: Integration): string | null {
     case "stripe":
       return integration.config.account_id;
     case "railway":
-      return integration.config.service_id;
+      return integration.config.service_id || integration.config.project_id;
     case "dns":
       return `${integration.config.provider}:${integration.config.zone_id}`;
     case "analytics":
