@@ -1,0 +1,22 @@
+# Railway service config for the Bentropy MCP server.
+#
+# This is the SECOND service in the Bentropy Railway project (the web app's
+# railway.toml lives at the repo root). Both services inherit
+# SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and
+# ENCRYPTION_KEY from Railway project-level variables.
+#
+# Note: this Railway deploy keeps the MCP server compiled + warm for a future
+# HTTP-MCP transport. For current local Claude Code usage, `docs/mcp-setup.md`
+# wires stdio against `mcp/dist/mcp/src/index.js` directly — MCP stdio is not
+# something Railway can hand to a remote client.
+#
+# No [[cron]] entries here — the MCP server is event-driven, not scheduled.
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm ci && npm run build"
+
+[deploy]
+startCommand = "npm run start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

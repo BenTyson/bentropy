@@ -1,5 +1,7 @@
-import "server-only";
-
+// Shared between the Next.js app (server-side only — imports node:crypto, so
+// bundling into a client component fails at build time) and the MCP server
+// at `mcp/`. Do NOT add `import "server-only"` here — it would break the MCP
+// reuse path, and the node: import already guards against client bundling.
 import {
   createCipheriv,
   createDecipheriv,

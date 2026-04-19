@@ -1,8 +1,32 @@
 # Current Status
 
-**Last update:** 2026-04-18 (M4 Session A complete; Session B pending)
+**Last update:** 2026-04-19 (M4 complete — Sessions A + B both shipped; M5 pending)
 
 ## What's done
+
+### M4 Session B — MCP server skeleton + 4 read tools (complete)
+
+- **New `mcp/` package** ([mcp/package.json](../../mcp/package.json)) — standalone ESM Node package (`"type": "module"`, Node >=20). Deps: `@modelcontextprotocol/sdk` + `@supabase/supabase-js`. No Next dependency. Scripts: `build` (tsc), `start` (node dist/mcp/src/index.js), `dev` (tsx watch).
+
+- **Shared code via tsconfig `rootDir: ".."`** ([mcp/tsconfig.json](../../mcp/tsconfig.json)) — includes `../src/lib/db/types.ts` + `../src/lib/crypto.ts` alongside `mcp/src`. Output nests as `dist/mcp/src/...` + `dist/src/lib/...`. `module: "ESNext"` + `moduleResolution: "Bundler"` so TS emits ESM regardless of the root package's CJS default (nearest-package.json detection with NodeNext would have compiled crypto.ts as CommonJS while mcp runs as ESM — explicit ESNext sidesteps the mismatch).
+
+- **`import "server-only"` dropped from [src/lib/crypto.ts](../../src/lib/crypto.ts)** — the node:crypto import already blocks client bundling (Turbopack errors at build time on browser targets), so the safety is preserved. Comment at the top explains the shared-with-MCP invariant. Next build re-verified clean.
+
+- **Service-role Supabase client** ([mcp/src/supabase.ts](../../mcp/src/supabase.ts)) — standalone from the web app's `src/lib/supabase/service.ts` because that file uses Next's `"server-only"` and reads `NEXT_PUBLIC_*`. The MCP version accepts `SUPABASE_URL` first, falls back to `NEXT_PUBLIC_SUPABASE_URL`.
+
+- **Four read-only tools** (one file each in [mcp/src/tools/](../../mcp/src/tools)):
+  - `list_projects` — no args; returns `[{slug, name, status, primary_domain, tagline}]` ordered by `display_order`.
+  - `get_project` — `{slug}`; full rollup (project + credentials (masked, never plaintext) + repositories + local_services + notes + integrations each with their latest `integration_snapshots` row).
+  - `list_integrations` — `{project}` (slug); returns integrations + `sync_status`/`last_synced_at`/`sync_error` + latest snapshot per integration.
+  - `get_credential` — `{project, name}`; the ONE decrypt path. Runs `isEncryptedPayload()` guard first so a lingering `PLACEHOLDER_*` fails with a clear message instead of throwing mid-decrypt. Plaintext is only in the return value — the decrypt `catch` deliberately strips the underlying error so plaintext can't leak into error strings.
+
+- **Server entry** ([mcp/src/index.ts](../../mcp/src/index.ts)) — env check fails fast via stderr + exit(1) if any of `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `ENCRYPTION_KEY` is missing. Uses the low-level `Server` + `setRequestHandler(ListToolsRequestSchema | CallToolRequestSchema, ...)` API (the class is marked deprecated in v1.x in favor of `McpServer` but still stable; the 4 explicit request-schema handlers keep the behaviour obvious). Every tool handler is wrapped in try/catch → returns `{isError: true, content: [{type: "text", text: message}]}` so thrown errors never crash the stdio transport.
+
+- **Railway service** ([mcp/railway.toml](../../mcp/railway.toml)) — second service in the Bentropy Railway project. Build `npm ci && npm run build`, start `npm run start`, no cron (MCP is event-driven). Comment notes this deploy is currently warm-standby for a future HTTP-MCP migration; Claude Code itself talks stdio to a local `node ...` command, not the Railway URL.
+
+- **Setup doc** ([docs/mcp-setup.md](../mcp-setup.md)) — spells out the stdio-vs-HTTP distinction, the exact `mcpServers` JSON to paste into `~/.claude.json`, how to verify with `/mcp` + sample tool calls, and a failure-mode table. We deliberately don't auto-write `~/.claude.json` — Ben edits it manually so nothing unexpected lands in global config.
+
+- **Build + smoke test**: `cd mcp && npm run build` clean. `node dist/mcp/src/index.js` with no env exits 1 with the missing-var list. With env set, the server logs `stdio server ready` on stderr and responds correctly to the MCP initialize + `tools/list` handshake (all 4 tools registered with their schemas).
 
 ### M4 Session A — Vercel + Railway live sync (complete)
 
@@ -65,12 +89,23 @@ The credential resolution is `secret_ref` first, then fall back to `credentials`
 - **Integration edit UI** — still delete + recreate for `config` changes. Blocks the M4 verification step where Ben needs to replace placeholder Vercel/Railway IDs.
 - **Deprecated `Github` icon** from `lucide-react` and the `middleware.ts → proxy.ts` Next 16 warning — cosmetic, unchanged.
 
+## What Ben needs to do before Session B verification works end-to-end
+
+1. **Build the MCP package locally** (once, and whenever `mcp/` or `src/lib/{crypto,db/types}.ts` change):
+   ```bash
+   cd mcp && npm install && npm run build
+   ```
+
+2. **Add the `bentropy` entry to `~/.claude.json`** per [docs/mcp-setup.md](../mcp-setup.md). Paste the same `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `ENCRYPTION_KEY` values from `.env.local` into the `env` block of the server definition. Restart Claude Code so it re-reads the config.
+
+3. **Deploy the MCP as the second Railway service** (optional for now — only matters once HTTP-MCP is real). Point Railway at the `mcp/` subdirectory; it'll pick up `mcp/railway.toml` and `mcp/package.json`. Share the three env vars with the web service via the project-level variables panel. Without this step the web app stays on Railway and MCP runs locally — that's fine for M4/M5.
+
 ## What's next
 
-**M4 Session B** — MCP server skeleton (new `mcp/` package) + 4 read tools (`list_projects`, `get_project`, `list_integrations`, `get_credential`) + Railway deploy as a second service in the Bentropy Railway project + Claude Code `~/.claude.json` `mcpServers` entry. Use **Opus 4.7** per the plan.
+**M5** — MCP write tools (`add_note`, `update_project_status`, `upsert_credential`) + GitHub integration following the Vercel/Railway pattern. Use **Sonnet 4.6** per the plan — the pattern is now established.
 
-Verification for M4 completion (both sessions):
+End-to-end verification for M4 (both sessions combined):
 - `POST /api/cron/sync-vercel` with the secret → Finch card flips to `sync_status=ok` + `last_synced_at` populated + a new `integration_snapshots` row.
 - Same for Railway + SaltGoat.
 - Refresh button on a card in the browser → card updates in place (no full reload), `sync_log` gains a row.
-- From a Claude Code session inside any repo, `list_projects` returns Finch + SaltGoat (Session B).
+- From a Claude Code session inside any repo, `list_projects` returns Finch + SaltGoat + the 7 showcase projects; `get_project` with `{"slug": "finch"}` returns the Vercel snapshot from Session A; `get_credential` with `{"project": "finch", "name": "Vercel PAT"}` returns the raw token string.
