@@ -51,20 +51,23 @@ interface RailwayDeploymentRaw {
   meta?: Record<string, unknown>;
 }
 
-export async function fetchRailwayDeploymentSnapshot(
-  config: RailwayConfig,
-  pat: string,
-): Promise<RailwayDeploymentSnapshot> {
-  if (!config.project_id || !config.service_id || !config.environment_id) {
-    throw new Error(
-      "Railway config missing project_id / service_id / environment_id",
-    );
-  }
+type RailwayGraphQLResponse = {
+  data?: {
+    deployments?: {
+      edges?: Array<{ node?: RailwayDeploymentRaw }>;
+    };
+  };
+  errors?: Array<{ message: string }>;
+};
 
+async function railwayPost(
+  headers: Record<string, string>,
+  config: RailwayConfig,
+): Promise<{ httpStatus: number; payload: RailwayGraphQLResponse; body?: string }> {
   const res = await fetch(RAILWAY_GRAPHQL_ENDPOINT, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${pat}`,
+      ...headers,
       "Content-Type": "application/json",
       Accept: "application/json",
     },
@@ -81,19 +84,49 @@ export async function fetchRailwayDeploymentSnapshot(
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
+    return { httpStatus: res.status, payload: {}, body };
+  }
+
+  const payload = (await res.json()) as RailwayGraphQLResponse;
+  return { httpStatus: res.status, payload };
+}
+
+function isAuthError(result: {
+  httpStatus: number;
+  payload: RailwayGraphQLResponse;
+}): boolean {
+  if (result.httpStatus === 401 || result.httpStatus === 403) return true;
+  const msg = result.payload.errors?.map((e) => e.message).join(" ") ?? "";
+  return /not authorized|unauthorized|problem processing request/i.test(msg);
+}
+
+export async function fetchRailwayDeploymentSnapshot(
+  config: RailwayConfig,
+  pat: string,
+): Promise<RailwayDeploymentSnapshot> {
+  if (!config.project_id || !config.service_id || !config.environment_id) {
     throw new Error(
-      `Railway API ${res.status} ${res.statusText}${body ? `: ${body.slice(0, 300)}` : ""}`,
+      "Railway config missing project_id / service_id / environment_id",
     );
   }
 
-  const payload = (await res.json()) as {
-    data?: {
-      deployments?: {
-        edges?: Array<{ node?: RailwayDeploymentRaw }>;
-      };
-    };
-    errors?: Array<{ message: string }>;
-  };
+  // Railway has two token types with different headers:
+  //   - Project token (created from a project's Tokens settings): Project-Access-Token
+  //   - Account / team token (account/tokens): Authorization: Bearer
+  // Try project-token first (more common for per-project integrations); fall
+  // back to bearer on auth failure. Only one extra request on mis-match.
+  let result = await railwayPost({ "Project-Access-Token": pat }, config);
+  if (isAuthError(result)) {
+    result = await railwayPost({ Authorization: `Bearer ${pat}` }, config);
+  }
+
+  if (result.httpStatus < 200 || result.httpStatus >= 300) {
+    throw new Error(
+      `Railway API ${result.httpStatus}${result.body ? `: ${result.body.slice(0, 300)}` : ""}`,
+    );
+  }
+
+  const payload = result.payload;
 
   if (payload.errors?.length) {
     throw new Error(
