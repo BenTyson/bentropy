@@ -9,6 +9,7 @@ import type {
 } from "@/lib/db/types";
 import { fetchVercelDeploymentSnapshot } from "./vercel";
 import { fetchRailwayDeploymentSnapshot } from "./railway";
+import { fetchGithubSnapshot } from "./github";
 
 // Untyped on purpose: the generated Database types don't flow through
 // writes on the integration/snapshot/log tables without widening that's
@@ -85,6 +86,10 @@ async function runIntegrationFetch(
         integration.config,
         pat,
       );
+      return snap as unknown as Record<string, unknown>;
+    }
+    case "github": {
+      const snap = await fetchGithubSnapshot(integration.config, pat);
       return snap as unknown as Record<string, unknown>;
     }
     default:

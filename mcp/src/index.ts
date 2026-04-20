@@ -20,6 +20,15 @@ import {
   getCredentialDefinition,
   runGetCredential,
 } from "./tools/get_credential.js";
+import { addNoteDefinition, runAddNote } from "./tools/add_note.js";
+import {
+  updateProjectStatusDefinition,
+  runUpdateProjectStatus,
+} from "./tools/update_project_status.js";
+import {
+  upsertCredentialDefinition,
+  runUpsertCredential,
+} from "./tools/upsert_credential.js";
 
 function checkEnv() {
   const missing: string[] = [];
@@ -53,6 +62,9 @@ async function main() {
     getProjectDefinition,
     listIntegrationsDefinition,
     getCredentialDefinition,
+    addNoteDefinition,
+    updateProjectStatusDefinition,
+    upsertCredentialDefinition,
   ];
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -85,6 +97,12 @@ async function main() {
         return runListIntegrations(supabase, args);
       case "get_credential":
         return runGetCredential(supabase, args);
+      case "add_note":
+        return runAddNote(supabase, args);
+      case "update_project_status":
+        return runUpdateProjectStatus(supabase, args);
+      case "upsert_credential":
+        return runUpsertCredential(supabase, args);
       default:
         throw new Error(`Unknown tool: ${name}`);
     }

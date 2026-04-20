@@ -35,3 +35,8 @@ command = "curl -fsS -X POST -H \"Authorization: Bearer $CRON_SECRET\" \"https:/
 name = "sync-railway"
 schedule = "*/15 * * * *"
 command = "curl -fsS -X POST -H \"Authorization: Bearer $CRON_SECRET\" \"https://$RAILWAY_PUBLIC_DOMAIN/api/cron/sync-railway\""
+
+[[cron]]
+name = "sync-github"
+schedule = "*/15 * * * *"
+command = "curl -fsS -X POST -H \"Authorization: Bearer $CRON_SECRET\" \"https://$RAILWAY_PUBLIC_DOMAIN/api/cron/sync-github\""
