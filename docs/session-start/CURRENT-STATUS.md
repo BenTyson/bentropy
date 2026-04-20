@@ -1,8 +1,26 @@
 # Current Status
 
-**Last update:** 2026-04-20 (M6 Session C complete — Supabase autopull + rotation warnings + source column)
+**Last update:** 2026-04-20 (M7 complete — Stripe credential autopull)
 
 ## What's done
+
+### M7 — Stripe credential autopull (complete)
+
+**Stripe integration client** ([src/lib/integrations/stripe.ts](../../src/lib/integrations/stripe.ts)):
+- `fetchStripeAccount(secretKey)` — GET `https://api.stripe.com/v1/account` with Bearer auth.
+- Returns `{id: string, display_name: string | null}`. Used to validate the key is live and to get `acct_...` for project matching.
+
+**Stripe autopull route** ([src/app/api/cron/pull-credentials/stripe/route.ts](../../src/app/api/cron/pull-credentials/stripe/route.ts)):
+- Same shape as Vercel/Railway/Supabase routes. Iterates `provider_accounts` where `provider='stripe'`.
+- `external_account_id` on the provider account = Stripe `acct_...` id (set at registration time).
+- Decrypts master credential (the Stripe secret key itself: `sk_live_*`, `sk_test_*`, or `rk_live_*`).
+- Validates key via `GET /v1/account`; matches Bentropy project via `integrations` where `type='stripe'` and `config->>account_id = <acct_...>`.
+- Upserts one credential per matched project: `STRIPE_SECRET_KEY` with `source='autopull'`, `service='stripe'`.
+- Note: Stripe has no "list child keys" endpoint — the master secret key IS the project credential. The route validates + re-upserts it on each run (no-op if unchanged).
+
+**railway.toml** — fourth `[[cron]]` entry for `pull-credentials-stripe` on `0 */6 * * *`.
+
+**Build verified**: `npm run build` clean. `/api/cron/pull-credentials/stripe` in route table.
 
 ### M6 Session C — source column + Supabase autopull + rotation warnings (complete)
 
@@ -77,13 +95,21 @@ where project_id = (select id from projects where slug = 'finch')
 ### M2 — Per-project detail page + Finch/SaltGoat seed (complete)
 ### M1 — DB + admin wired (complete)
 
-## What's next (after M6)
+## What's next
 
-**M6 is complete.** Remaining integrations each follow the established pattern (~1 Sonnet session each):
-- **Stripe** — `/api/cron/pull-credentials/stripe`, Stripe API keys via Stripe Management API or Restricted Key scheme.
+**M7 is complete.** Remaining integrations each follow the established pattern (~1 Sonnet session each):
 - **DNS** — provider-specific (Cloudflare, etc.).
 - **Analytics** — provider-specific (Plausible, PostHog, etc.).
 - **Local dev** — manual-only, no autopull.
+
+## What Ben needs to do to verify M7
+
+**Stripe autopull**:
+1. Register a Stripe provider account on `/admin/provider-accounts`: `provider=stripe`, `display_name` e.g. "Ben (Stripe)", `external_account_id` = Stripe account id (`acct_...`), `master_credential_id` = a credential holding the Stripe secret key (`sk_live_*` or `rk_live_*`).
+2. Add a Stripe integration row on Finch's detail page with `config: {"account_id": "acct_..."}` (same `acct_...` as above).
+3. `POST /api/cron/pull-credentials/stripe` with `Authorization: Bearer $CRON_SECRET`.
+4. Confirm `STRIPE_SECRET_KEY` appears in credentials for Finch with `source='autopull'` and `service='stripe'`.
+5. Re-run — expect `skipped_unchanged: 1`, no second insert.
 
 ## What Ben needs to do to verify M6 Session C
 
