@@ -1,8 +1,24 @@
 # Current Status
 
-**Last update:** 2026-04-20 (M7 complete — Stripe credential autopull)
+**Last update:** 2026-04-20 (M8 complete — DNS/Cloudflare credential autopull)
 
 ## What's done
+
+### M8 — DNS credential autopull (complete)
+
+**DNS integration client** ([src/lib/integrations/dns.ts](../../src/lib/integrations/dns.ts)):
+- `fetchCloudflareZones(apiToken)` — paginated GET `https://api.cloudflare.com/client/v4/zones?per_page=50`. Loops until `page >= total_pages`. Returns `{id, name}[]`.
+
+**DNS autopull route** ([src/app/api/cron/pull-credentials/dns/route.ts](../../src/app/api/cron/pull-credentials/dns/route.ts)):
+- Same shape as all prior autopull routes. Iterates `provider_accounts` where `provider='dns'`.
+- `external_account_id` = Cloudflare account id (registration-time only; not used for zone matching).
+- Lists all zones under the account's API token. For each zone, matches via `integrations` where `type='dns'` and `config->>zone_id = <zone.id>`.
+- Upserts `CLOUDFLARE_API_TOKEN` with `service='dns'`, `source='autopull'` on every matched project. Same token goes to all matched projects (token is account-scoped, not zone-scoped).
+- `zones_found` + `skipped_unmatched` in result let you see how many zones had no corresponding Bentropy integration.
+
+**railway.toml** — fifth `[[cron]]` entry for `pull-credentials-dns` on `0 */6 * * *`.
+
+**Build verified**: `npm run build` clean. `/api/cron/pull-credentials/dns` in route table.
 
 ### M7 — Stripe credential autopull (complete)
 
@@ -97,10 +113,18 @@ where project_id = (select id from projects where slug = 'finch')
 
 ## What's next
 
-**M7 is complete.** Remaining integrations each follow the established pattern (~1 Sonnet session each):
-- **DNS** — provider-specific (Cloudflare, etc.).
+**M8 is complete.** Remaining integrations each follow the established pattern (~1 Sonnet session each):
 - **Analytics** — provider-specific (Plausible, PostHog, etc.).
 - **Local dev** — manual-only, no autopull.
+
+## What Ben needs to do to verify M8
+
+**DNS (Cloudflare) autopull**:
+1. Register a Cloudflare provider account on `/admin/provider-accounts`: `provider=dns`, `display_name` e.g. "Ben (Cloudflare)", `external_account_id` = Cloudflare account id (find it at `https://dash.cloudflare.com` → account home → ID in URL, or `GET /client/v4/accounts` with the token), `master_credential_id` = a credential holding the Cloudflare API token.
+2. Add a `dns` integration row on Finch's detail page with `config: {"provider": "cloudflare", "zone_id": "<zone-id>"}` (zone id from Cloudflare dashboard → domain → Overview → Zone ID).
+3. `POST /api/cron/pull-credentials/dns` with `Authorization: Bearer $CRON_SECRET`.
+4. Confirm `CLOUDFLARE_API_TOKEN` appears in credentials for Finch with `source='autopull'` and `service='dns'`.
+5. Re-run — expect `skipped_unchanged: 1`, `zones_found > 0`.
 
 ## What Ben needs to do to verify M7
 
