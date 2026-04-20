@@ -1,8 +1,21 @@
 # Current Status
 
-**Last update:** 2026-04-20 (M9 complete — Analytics/Umami credential autopull)
+**Last update:** 2026-04-20 (M10 complete — Local dev integration UI)
 
 ## What's done
+
+### M10 — Local dev integration UI (complete)
+
+**Per-project detail page** ([src/app/admin/projects/[slug]/page.tsx](../../src/app/admin/projects/%5Bslug%5D/page.tsx)):
+- `integrations` is now split: `local` type goes to Card 5 (Local Dev), everything else to Card 2 (Integrations grid). No more misleading "pending"/"Never synced" noise for local services in Card 2.
+- Card 5 merges both sources into a unified `LocalDevEntry` list sorted by port: legacy `local_services` rows (existing Finch/SaltGoat data) + new `local` type integrations from the `integrations` table.
+- Port renders as a clickable `localhost:PORT` link. `is_active` badge shown only for legacy rows (not applicable to integration-based entries). Start command in monospace, notes when present.
+- Card 5 header now has an "Add service" button (links to the integrations/new form with `type=local` as the natural entry path going forward).
+- No migration needed — legacy `local_services` data continues to render untouched; new services added via "Add integration" flow flow into Card 5 automatically.
+
+**Build verified**: `npm run build` clean.
+
+### M9 — Analytics credential autopull (complete)
 
 ### M9 — Analytics credential autopull (complete)
 
@@ -140,8 +153,10 @@ where project_id = (select id from projects where slug = 'finch')
 
 ## What's next
 
-**M9 is complete.** Remaining:
-- **Local dev** — manual-only, no autopull.
+**M10 is complete.** All planned milestones are done. Remaining follow-ups:
+- Migrate `local_services` rows into `integrations` (type=local) when convenient — both sources render in Card 5 so no urgency.
+- Integration edit UI (still delete + recreate for config changes).
+- `github` type missing from RefreshButton enabled list.
 
 ## What Ben needs to do to verify M9
 

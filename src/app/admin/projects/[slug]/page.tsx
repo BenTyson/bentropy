@@ -6,7 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IntegrationCard } from "@/components/admin/IntegrationCard";
 import { getProjectBySlug } from "@/lib/db/queries";
-import type { ProjectStatus } from "@/lib/db/types";
+import type { Integration, ProjectStatus } from "@/lib/db/types";
+
+type LocalIntegration = Extract<Integration, { type: "local" }>;
+
+type LocalDevEntry = {
+  id: string;
+  name: string;
+  port: number;
+  startCommand: string | null;
+  notes: string | null;
+  isActive: boolean | null;
+};
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +37,30 @@ export default async function ProjectDetailPage({
   if (!rollup) notFound();
 
   const { project, credentials, repositories, localServices, notes, integrations } = rollup;
+
+  const localIntegrations = integrations.filter(
+    (i): i is LocalIntegration => i.type === "local",
+  );
+  const syncedIntegrations = integrations.filter((i) => i.type !== "local");
+
+  const localDevEntries: LocalDevEntry[] = [
+    ...localServices.map((svc) => ({
+      id: svc.id,
+      name: svc.name,
+      port: svc.port,
+      startCommand: svc.start_command,
+      notes: svc.notes,
+      isActive: svc.is_active,
+    })),
+    ...localIntegrations.map((i) => ({
+      id: i.id,
+      name: i.display_name ?? "Dev server",
+      port: i.config.port,
+      startCommand: i.config.start_command ?? null,
+      notes: null,
+      isActive: null,
+    })),
+  ].sort((a, b) => a.port - b.port);
 
   return (
     <div className="space-y-6">
@@ -122,13 +157,13 @@ export default async function ProjectDetailPage({
           </div>
         </CardHeader>
         <CardContent>
-          {integrations.length === 0 ? (
+          {syncedIntegrations.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No integrations yet. Add one to start tracking live status.
             </p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {integrations.map((integration) => (
+              {syncedIntegrations.map((integration) => (
                 <IntegrationCard
                   key={integration.id}
                   integration={integration}
@@ -226,40 +261,57 @@ export default async function ProjectDetailPage({
       {/* Card 5: Local Dev */}
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Server className="w-4 h-4 text-muted-foreground" />
-            <CardTitle>Local Dev</CardTitle>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Server className="w-4 h-4 text-muted-foreground" />
+              <CardTitle>Local Dev</CardTitle>
+            </div>
+            <Link href={`/admin/projects/${project.slug}/integrations/new`}>
+              <Button size="sm" variant="outline">
+                <Plus className="w-4 h-4 mr-1" />
+                Add service
+              </Button>
+            </Link>
           </div>
         </CardHeader>
         <CardContent>
-          {localServices.length === 0 ? (
+          {localDevEntries.length === 0 ? (
             <p className="text-sm text-muted-foreground">No local services configured.</p>
           ) : (
             <div className="divide-y">
-              {localServices.map((svc) => (
+              {localDevEntries.map((entry) => (
                 <div
-                  key={svc.id}
+                  key={entry.id}
                   className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0"
                 >
                   <div className="min-w-0">
-                    <div className="font-medium text-sm">{svc.name}</div>
-                    {svc.start_command && (
+                    <div className="font-medium text-sm">{entry.name}</div>
+                    {entry.startCommand && (
                       <div className="text-xs font-mono text-muted-foreground mt-0.5">
-                        {svc.start_command}
+                        {entry.startCommand}
                       </div>
                     )}
-                    {svc.notes && (
-                      <div className="text-xs text-muted-foreground mt-0.5">{svc.notes}</div>
+                    {entry.notes && (
+                      <div className="text-xs text-muted-foreground mt-0.5">{entry.notes}</div>
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs font-mono text-muted-foreground">:{svc.port}</span>
-                    <Badge
-                      className={svc.is_active ? "bg-entropy-ordered text-white" : ""}
-                      variant={svc.is_active ? "default" : "outline"}
+                    <a
+                      href={`http://localhost:${entry.port}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-mono text-accent-blue hover:underline"
                     >
-                      {svc.is_active ? "running" : "stopped"}
-                    </Badge>
+                      :{entry.port}
+                    </a>
+                    {entry.isActive !== null && (
+                      <Badge
+                        className={entry.isActive ? "bg-entropy-ordered text-white" : ""}
+                        variant={entry.isActive ? "default" : "outline"}
+                      >
+                        {entry.isActive ? "running" : "stopped"}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               ))}
