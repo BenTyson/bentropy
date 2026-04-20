@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Integration, IntegrationType, SyncStatus } from "@/lib/db/types";
 import { refreshIntegration } from "@/lib/db/actions";
 import { RefreshButton } from "./RefreshButton";
+import { IntegrationEditButton } from "./IntegrationEditButton";
 
 const typeMeta: Record<
   IntegrationType,
@@ -94,11 +95,17 @@ export function IntegrationCard({
               {integration.display_name || meta.label}
             </CardTitle>
           </div>
-          {status ? (
-            <Badge className={statusColors[status]}>{status}</Badge>
-          ) : (
-            <Badge variant="outline">pending</Badge>
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            {status ? (
+              <Badge className={statusColors[status]}>{status}</Badge>
+            ) : (
+              <Badge variant="outline">pending</Badge>
+            )}
+            <IntegrationEditButton
+              integration={integration}
+              projectSlug={projectSlug}
+            />
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">

@@ -26,11 +26,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plug, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plug, Plus, Trash2 } from "lucide-react";
 import {
   createProviderAccount,
   deleteProviderAccount,
+  updateProviderAccount,
   type ProviderAccountInput,
+  type ProviderAccountUpdateInput,
 } from "@/lib/db/actions";
 import type { ProviderAccount } from "@/lib/db/types";
 
@@ -87,32 +89,60 @@ export function ProviderAccountsClient({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<ProviderAccount | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [error, setError] = useState<string | null>(null);
 
   const filteredCredentials = useMemo(() => {
-    if (!form.provider) return credentials;
-    return credentials.filter((c) => c.service === form.provider);
-  }, [form.provider, credentials]);
+    const provider = editing ? editing.provider : form.provider;
+    if (!provider) return credentials;
+    return credentials.filter((c) => c.service === provider);
+  }, [editing, form.provider, credentials]);
 
   function openCreate() {
+    setEditing(null);
     setForm(emptyForm);
+    setError(null);
+    setIsDialogOpen(true);
+  }
+
+  function openEdit(account: ProviderAccount) {
+    setEditing(account);
+    setForm({
+      provider: account.provider,
+      display_name: account.display_name,
+      external_account_id: account.external_account_id,
+      master_credential_id: account.master_credential_id ?? NONE,
+    });
     setError(null);
     setIsDialogOpen(true);
   }
 
   function save() {
     setError(null);
-    if (!form.provider || !form.display_name || !form.external_account_id) {
-      setError("Provider, display name, and external account id are required.");
+    if (!form.display_name || !form.external_account_id) {
+      setError("Display name and external account id are required.");
       return;
     }
-    const input = toInput(form);
     startTransition(async () => {
       try {
-        await createProviderAccount(input);
+        if (editing) {
+          const input: ProviderAccountUpdateInput = {
+            display_name: form.display_name,
+            external_account_id: form.external_account_id,
+            master_credential_id: form.master_credential_id === NONE ? null : form.master_credential_id,
+          };
+          await updateProviderAccount(editing.id, input);
+        } else {
+          if (!form.provider) {
+            setError("Provider is required.");
+            return;
+          }
+          await createProviderAccount(toInput(form));
+        }
         setIsDialogOpen(false);
         setForm(emptyForm);
+        setEditing(null);
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Save failed");
@@ -156,31 +186,35 @@ export function ProviderAccountsClient({
           </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>Add Provider Account</DialogTitle>
+              <DialogTitle>{editing ? "Edit Provider Account" : "Add Provider Account"}</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <Field label="Provider">
-                <Select
-                  value={form.provider}
-                  onValueChange={(value) =>
-                    setForm({
-                      ...form,
-                      provider: value,
-                      master_credential_id: NONE,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pick a provider" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROVIDERS.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {editing ? (
+                  <Badge variant="secondary" className="w-fit">{editing.provider}</Badge>
+                ) : (
+                  <Select
+                    value={form.provider}
+                    onValueChange={(value) =>
+                      setForm({
+                        ...form,
+                        provider: value,
+                        master_credential_id: NONE,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pick a provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROVIDERS.map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {p}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </Field>
 
               <Field label="Display name">
@@ -222,9 +256,9 @@ export function ProviderAccountsClient({
                     ))}
                   </SelectContent>
                 </Select>
-                {form.provider && filteredCredentials.length === 0 && (
+                {(editing ? editing.provider : form.provider) && filteredCredentials.length === 0 && (
                   <p className="text-xs text-muted-foreground">
-                    No credentials with service=&quot;{form.provider}&quot;. Add
+                    No credentials with service=&quot;{editing ? editing.provider : form.provider}&quot;. Add
                     one at /admin/credentials first.
                   </p>
                 )}
@@ -240,7 +274,7 @@ export function ProviderAccountsClient({
                   Cancel
                 </Button>
                 <Button onClick={save} disabled={pending}>
-                  {pending ? "Saving..." : "Add"}
+                  {pending ? "Saving..." : editing ? "Save Changes" : "Add"}
                 </Button>
               </div>
             </div>
@@ -287,15 +321,26 @@ export function ProviderAccountsClient({
                         {account.provider}
                       </Badge>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => remove(account.id)}
-                      disabled={pending}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => openEdit(account)}
+                        disabled={pending}
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => remove(account.id)}
+                        disabled={pending}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2 text-xs text-muted-foreground">

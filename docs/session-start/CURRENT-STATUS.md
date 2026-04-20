@@ -1,6 +1,6 @@
 # Current Status
 
-**Last update:** 2026-04-20 (M10 complete — Local dev integration UI)
+**Last update:** 2026-04-20 (Inline edit complete — all entities now have edit paths)
 
 ## What's done
 
@@ -151,11 +151,35 @@ where project_id = (select id from projects where slug = 'finch')
 ### M2 — Per-project detail page + Finch/SaltGoat seed (complete)
 ### M1 — DB + admin wired (complete)
 
+## What's shipped (this session)
+
+### Inline edit — all entities
+
+**Server actions** ([src/lib/db/actions.ts](../../src/lib/db/actions.ts)):
+- `updateProviderAccount(id, input)` — edits `display_name`, `external_account_id`, `master_credential_id`
+- `updateIntegration(id, input, projectSlug?)` — edits `display_name`, `config`, `secret_ref`
+- `IntegrationUpdateInput` and `ProviderAccountUpdateInput` types exported
+
+**Provider accounts** ([src/app/admin/provider-accounts/ProviderAccountsClient.tsx](../../src/app/admin/provider-accounts/ProviderAccountsClient.tsx)):
+- Pencil button on each card opens pre-populated edit dialog
+- Provider is shown as read-only Badge (can't change post-creation)
+- Dialog title and Save button label reflect create vs edit mode
+
+**Integrations** ([src/components/admin/IntegrationEditButton.tsx](../../src/components/admin/IntegrationEditButton.tsx)):
+- New `"use client"` component rendered inside each `IntegrationCard`
+- Pencil opens pre-populated dialog with type-specific config fields (same layout as create form)
+- Trash2 button deletes the integration (with confirm prompt)
+- Both call `router.refresh()` on success
+
+**Already had edit** (confirmed, no changes needed):
+- Projects, Credentials, Repos, Services, Notes — all had full edit dialogs from prior work
+
+**Build verified**: `npm run build` clean.
+
 ## What's next
 
-**M10 is complete.** All planned milestones are done. Remaining follow-ups:
+**All planned milestones are done. Remaining follow-ups:**
 - Migrate `local_services` rows into `integrations` (type=local) when convenient — both sources render in Card 5 so no urgency.
-- Integration edit UI (still delete + recreate for config changes).
 - `github` type missing from RefreshButton enabled list.
 
 ## What Ben needs to do to verify M9

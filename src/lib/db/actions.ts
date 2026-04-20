@@ -415,6 +415,32 @@ export async function deleteIntegration(id: string, projectSlug?: string) {
   revalidatePath("/admin/integrations");
 }
 
+export interface IntegrationUpdateInput {
+  display_name?: string | null;
+  config: IntegrationConfigFor<IntegrationType>;
+  secret_ref?: string | null;
+}
+
+export async function updateIntegration(
+  id: string,
+  input: IntegrationUpdateInput,
+  projectSlug?: string,
+) {
+  const supabase = await db();
+  const { error } = await supabase
+    .from("integrations")
+    .update({
+      display_name: nullable(input.display_name),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      config: input.config as any,
+      secret_ref: nullable(input.secret_ref),
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  if (projectSlug) revalidatePath(`/admin/projects/${projectSlug}`);
+  revalidatePath("/admin/integrations");
+}
+
 // ===== Provider accounts =====
 
 export interface ProviderAccountInput {
@@ -432,6 +458,26 @@ export async function createProviderAccount(input: ProviderAccountInput) {
     external_account_id: input.external_account_id,
     master_credential_id: nullable(input.master_credential_id),
   });
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/provider-accounts");
+}
+
+export interface ProviderAccountUpdateInput {
+  display_name: string;
+  external_account_id: string;
+  master_credential_id?: string | null;
+}
+
+export async function updateProviderAccount(id: string, input: ProviderAccountUpdateInput) {
+  const supabase = await db();
+  const { error } = await supabase
+    .from("provider_accounts")
+    .update({
+      display_name: input.display_name,
+      external_account_id: input.external_account_id,
+      master_credential_id: nullable(input.master_credential_id),
+    })
+    .eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/admin/provider-accounts");
 }
