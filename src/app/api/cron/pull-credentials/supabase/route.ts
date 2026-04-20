@@ -4,16 +4,11 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { decrypt, encrypt, isEncryptedPayload } from "@/lib/crypto";
 import {
-  fetchRailwayProjectsForWorkspace,
-  fetchRailwayVariables,
-} from "@/lib/integrations/railway";
+  fetchSupabaseProjectApiKeys,
+  fetchSupabaseProjectsForOrg,
+} from "@/lib/integrations/supabase";
 import { warnOnStaleMasterCredentials } from "@/lib/integrations/rotation";
-import type {
-  Credential,
-  Integration,
-  ProviderAccount,
-  RailwayConfig,
-} from "@/lib/db/types";
+import type { Credential, Integration, ProviderAccount, SupabaseConfig } from "@/lib/db/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -35,6 +30,78 @@ interface AccountResult {
   skipped_unchanged: number;
   skipped_unmatched: number;
   error?: string;
+}
+
+// Key name constants: anon → SUPABASE_ANON_KEY, service_role → SUPABASE_SERVICE_ROLE_KEY
+const KEY_NAME_MAP: Record<string, string> = {
+  anon: "SUPABASE_ANON_KEY",
+  service_role: "SUPABASE_SERVICE_ROLE_KEY",
+};
+
+async function upsertCredential(
+  supabase: ReturnType<typeof createServiceClient>,
+  projectId: string,
+  name: string,
+  value: string,
+  notes: string,
+  result: AccountResult,
+): Promise<void> {
+  const { data: existing } = await supabase
+    .from("credentials")
+    .select("id, source, key_encrypted")
+    .eq("project_id", projectId)
+    .eq("name", name)
+    .maybeSingle();
+
+  if (existing) {
+    const row = existing as Pick<Credential, "id" | "source" | "key_encrypted">;
+    if (row.source === "manual") {
+      result.skipped_manual += 1;
+      return;
+    }
+    // source === 'autopull': compare decrypted to avoid noise-free updated_at churn
+    let existingPlaintext: string | null = null;
+    try {
+      if (isEncryptedPayload(row.key_encrypted)) {
+        existingPlaintext = decrypt(row.key_encrypted);
+      }
+    } catch {
+      // Can't decrypt — treat as changed
+    }
+    if (existingPlaintext === value) {
+      result.skipped_unchanged += 1;
+      return;
+    }
+    const { error: updateErr } = await supabase
+      .from("credentials")
+      .update({ key_encrypted: encrypt(value) })
+      .eq("id", row.id);
+    if (updateErr) {
+      console.error(
+        `[pull-credentials/supabase] update failed for ${projectId}/${name}: ${updateErr.message}`,
+      );
+      return;
+    }
+    result.updated += 1;
+    return;
+  }
+
+  const { error: insertErr } = await supabase.from("credentials").insert({
+    project_id: projectId,
+    name,
+    service: "supabase",
+    key_encrypted: encrypt(value),
+    expires_at: null,
+    source: "autopull",
+    notes,
+  });
+  if (insertErr) {
+    console.error(
+      `[pull-credentials/supabase] insert failed for ${projectId}/${name}: ${insertErr.message}`,
+    );
+    return;
+  }
+  result.inserted += 1;
 }
 
 async function processAccount(
@@ -73,9 +140,10 @@ async function processAccount(
   }
   const pat = decrypt(credential.key_encrypted);
 
-  let railwayProjects: Awaited<ReturnType<typeof fetchRailwayProjectsForWorkspace>>;
+  // external_account_id for Supabase provider accounts is the org slug
+  let supabaseProjects: Awaited<ReturnType<typeof fetchSupabaseProjectsForOrg>>;
   try {
-    railwayProjects = await fetchRailwayProjectsForWorkspace(
+    supabaseProjects = await fetchSupabaseProjectsForOrg(
       pat,
       account.external_account_id,
     );
@@ -84,16 +152,13 @@ async function processAccount(
     return result;
   }
 
-  for (const rp of railwayProjects) {
-    // Railway projects don't have a direct column on projects — match via an
-    // existing railway integration whose config.project_id equals the Railway
-    // API id. That integration also pins the service + environment used for
-    // the variables query.
+  for (const sp of supabaseProjects) {
+    // Match via integrations row where type='supabase' and config->>project_ref = sp.ref
     const { data: integrationRow } = await supabase
       .from("integrations")
       .select("*")
-      .eq("type", "railway")
-      .eq("config->>project_id", rp.id)
+      .eq("type", "supabase")
+      .eq("config->>project_ref", sp.ref)
       .maybeSingle();
 
     if (!integrationRow) {
@@ -101,84 +166,34 @@ async function processAccount(
       continue;
     }
     const integration = integrationRow as Integration;
-    if (integration.type !== "railway") continue;
-    const cfg = integration.config as RailwayConfig;
+    if (integration.type !== "supabase") continue;
+    const cfg = integration.config as SupabaseConfig;
     result.matched_projects += 1;
 
-    let variables: Record<string, string>;
+    let apiKeys: Awaited<ReturnType<typeof fetchSupabaseProjectApiKeys>>;
     try {
-      variables = await fetchRailwayVariables(
-        pat,
-        cfg.project_id,
-        cfg.environment_id,
-        cfg.service_id,
-      );
+      apiKeys = await fetchSupabaseProjectApiKeys(pat, cfg.project_ref);
     } catch (err) {
       console.error(
-        `[pull-credentials/railway] variables fetch failed for ${rp.name} (${rp.id}): ${
+        `[pull-credentials/supabase] api-keys fetch failed for ${sp.name} (${sp.ref}): ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
       continue;
     }
 
-    for (const [key, value] of Object.entries(variables)) {
-      const { data: existing } = await supabase
-        .from("credentials")
-        .select("id, source, key_encrypted")
-        .eq("project_id", integration.project_id)
-        .eq("name", key)
-        .maybeSingle();
+    for (const key of apiKeys) {
+      const credName = KEY_NAME_MAP[key.name];
+      if (!credName) continue; // skip unrecognised key types
 
-      if (existing) {
-        const row = existing as Pick<Credential, "id" | "source" | "key_encrypted">;
-        if (row.source === "manual") {
-          result.skipped_manual += 1;
-          continue;
-        }
-        // source === 'autopull': compare decrypted to avoid noise-free updated_at churn
-        let existingPlaintext: string | null = null;
-        try {
-          if (isEncryptedPayload(row.key_encrypted)) {
-            existingPlaintext = decrypt(row.key_encrypted);
-          }
-        } catch {
-          // Can't decrypt — treat as changed
-        }
-        if (existingPlaintext === value) {
-          result.skipped_unchanged += 1;
-          continue;
-        }
-        const { error: updateErr } = await supabase
-          .from("credentials")
-          .update({ key_encrypted: encrypt(value) })
-          .eq("id", row.id);
-        if (updateErr) {
-          console.error(
-            `[pull-credentials/railway] update failed for ${integration.project_id}/${key}: ${updateErr.message}`,
-          );
-          continue;
-        }
-        result.updated += 1;
-        continue;
-      }
-
-      const { error: insertErr } = await supabase.from("credentials").insert({
-        project_id: integration.project_id,
-        name: key,
-        service: "railway",
-        key_encrypted: encrypt(value),
-        expires_at: null,
-        source: "autopull",
-        notes: `Autopulled from Railway project ${rp.name}`,
-      });
-      if (insertErr) {
-        console.error(
-          `[pull-credentials/railway] insert failed for ${integration.project_id}/${key}: ${insertErr.message}`,
-        );
-        continue;
-      }
-      result.inserted += 1;
+      await upsertCredential(
+        supabase,
+        integration.project_id,
+        credName,
+        key.api_key,
+        `Autopulled from Supabase project ${sp.name} (${sp.ref})`,
+        result,
+      );
     }
   }
 
@@ -192,12 +207,12 @@ async function run(request: Request) {
 
   const supabase = createServiceClient();
 
-  await warnOnStaleMasterCredentials(supabase, "railway");
+  await warnOnStaleMasterCredentials(supabase, "supabase");
 
   const { data: accounts, error: acctErr } = await supabase
     .from("provider_accounts")
     .select("*")
-    .eq("provider", "railway")
+    .eq("provider", "supabase")
     .not("master_credential_id", "is", null);
   if (acctErr) {
     return NextResponse.json({ error: acctErr.message }, { status: 500 });
@@ -231,7 +246,7 @@ async function run(request: Request) {
   );
 
   return NextResponse.json({
-    type: "railway",
+    type: "supabase",
     accounts: results.length,
     ...summary,
     results,

@@ -7,6 +7,7 @@ import {
   fetchVercelProjectEnv,
   fetchVercelProjectsForAccount,
 } from "@/lib/integrations/vercel";
+import { warnOnStaleMasterCredentials } from "@/lib/integrations/rotation";
 import type { Credential, ProviderAccount } from "@/lib/db/types";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,9 @@ interface AccountResult {
   display_name: string;
   matched_projects: number;
   inserted: number;
-  skipped_existing: number;
+  updated: number;
+  skipped_manual: number;
+  skipped_unchanged: number;
   skipped_unmatched: number;
   error?: string;
 }
@@ -38,7 +41,9 @@ async function processAccount(
     display_name: account.display_name,
     matched_projects: 0,
     inserted: 0,
-    skipped_existing: 0,
+    updated: 0,
+    skipped_manual: 0,
+    skipped_unchanged: 0,
     skipped_unmatched: 0,
   };
 
@@ -102,13 +107,41 @@ async function processAccount(
     for (const env of envs) {
       const { data: existing } = await supabase
         .from("credentials")
-        .select("id")
+        .select("id, source, key_encrypted")
         .eq("project_id", bentropyProject.id)
         .eq("name", env.key)
         .maybeSingle();
 
       if (existing) {
-        result.skipped_existing += 1;
+        const row = existing as Pick<Credential, "id" | "source" | "key_encrypted">;
+        if (row.source === "manual") {
+          result.skipped_manual += 1;
+          continue;
+        }
+        // source === 'autopull': compare decrypted to avoid noise-free updated_at churn
+        let existingPlaintext: string | null = null;
+        try {
+          if (isEncryptedPayload(row.key_encrypted)) {
+            existingPlaintext = decrypt(row.key_encrypted);
+          }
+        } catch {
+          // Can't decrypt — treat as changed
+        }
+        if (existingPlaintext === env.value) {
+          result.skipped_unchanged += 1;
+          continue;
+        }
+        const { error: updateErr } = await supabase
+          .from("credentials")
+          .update({ key_encrypted: encrypt(env.value) })
+          .eq("id", row.id);
+        if (updateErr) {
+          console.error(
+            `[pull-credentials/vercel] update failed for ${bentropyProject.slug}/${env.key}: ${updateErr.message}`,
+          );
+          continue;
+        }
+        result.updated += 1;
         continue;
       }
 
@@ -118,6 +151,7 @@ async function processAccount(
         service: "vercel",
         key_encrypted: encrypt(env.value),
         expires_at: null,
+        source: "autopull",
         notes: `Autopulled from Vercel project ${vp.name} (${env.type}, target: ${env.target.join(",") || "all"})`,
       });
       if (insertErr) {
@@ -140,6 +174,8 @@ async function run(request: Request) {
 
   const supabase = createServiceClient();
 
+  await warnOnStaleMasterCredentials(supabase, "vercel");
+
   const { data: accounts, error: acctErr } = await supabase
     .from("provider_accounts")
     .select("*")
@@ -157,13 +193,23 @@ async function run(request: Request) {
   const summary = results.reduce(
     (acc, r) => {
       acc.inserted += r.inserted;
-      acc.skipped_existing += r.skipped_existing;
+      acc.updated += r.updated;
+      acc.skipped_manual += r.skipped_manual;
+      acc.skipped_unchanged += r.skipped_unchanged;
       acc.skipped_unmatched += r.skipped_unmatched;
       acc.matched_projects += r.matched_projects;
       if (r.error) acc.errors += 1;
       return acc;
     },
-    { inserted: 0, skipped_existing: 0, skipped_unmatched: 0, matched_projects: 0, errors: 0 },
+    {
+      inserted: 0,
+      updated: 0,
+      skipped_manual: 0,
+      skipped_unchanged: 0,
+      skipped_unmatched: 0,
+      matched_projects: 0,
+      errors: 0,
+    },
   );
 
   return NextResponse.json({

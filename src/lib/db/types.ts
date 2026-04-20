@@ -31,6 +31,7 @@ export interface Credential {
   project_id: string | null;
   expires_at: string | null;
   notes: string | null;
+  source: "manual" | "autopull";
   created_at: string;
   updated_at: string;
 }
@@ -212,7 +213,9 @@ export interface Database {
       };
       credentials: {
         Row: Credential;
-        Insert: Omit<Credential, "id" | "created_at" | "updated_at">;
+        Insert: Omit<Credential, "id" | "created_at" | "updated_at" | "source"> & {
+          source?: "manual" | "autopull";
+        };
         Update: Partial<Omit<Credential, "id">>;
       };
       local_services: {
