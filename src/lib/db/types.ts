@@ -152,11 +152,22 @@ export type IntegrationConfigFor<T extends IntegrationType> =
                   ? LocalIntegrationConfig
                   : never;
 
+export interface ProviderAccount {
+  id: string;
+  provider: string;
+  display_name: string;
+  external_account_id: string;
+  master_credential_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 type BaseIntegration = {
   id: string;
   project_id: string;
   display_name: string | null;
   secret_ref: string | null;
+  provider_account_id: string | null;
   last_synced_at: string | null;
   sync_status: SyncStatus | null;
   sync_error: string | null;
@@ -238,6 +249,11 @@ export interface Database {
         Row: SyncLog;
         Insert: Partial<Omit<SyncLog, "id">> & { integration_id: string | null };
         Update: Partial<Omit<SyncLog, "id">>;
+      };
+      provider_accounts: {
+        Row: ProviderAccount;
+        Insert: Omit<ProviderAccount, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<ProviderAccount, "id">>;
       };
     };
   };

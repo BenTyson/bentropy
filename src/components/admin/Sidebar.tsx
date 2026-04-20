@@ -14,6 +14,7 @@ import {
   LogOut,
   Gauge,
   Plug,
+  Building2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -21,6 +22,7 @@ const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/projects", label: "Projects", icon: FolderKanban },
   { href: "/admin/integrations", label: "Integrations", icon: Plug },
+  { href: "/admin/provider-accounts", label: "Providers", icon: Building2 },
   { href: "/admin/credentials", label: "Credentials", icon: Key },
   { href: "/admin/services", label: "Services", icon: Server },
   { href: "/admin/repos", label: "Repositories", icon: GitBranch },

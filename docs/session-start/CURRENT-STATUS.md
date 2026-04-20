@@ -1,8 +1,57 @@
 # Current Status
 
-**Last update:** 2026-04-19 (M5 complete — MCP write tools + GitHub integration shipped)
+**Last update:** 2026-04-19 (M6 Session A complete — `provider_accounts` schema + UI + sync wired)
 
 ## What's done
+
+### M6 Session A — provider_accounts schema + UI (complete)
+
+**Migration** ([supabase/migrations/20260419100000_provider_accounts.sql](../../supabase/migrations/20260419100000_provider_accounts.sql)):
+
+- New `provider_accounts` table: `id`, `provider`, `display_name`, `external_account_id`, `master_credential_id → credentials.id on delete set null`, `created_at`, `updated_at`. Unique on `(provider, external_account_id)`.
+- `alter table integrations add column if not exists provider_account_id uuid references provider_accounts(id) on delete set null`. Existing rows default to `null` and fall through to the project-credential path — no backfill.
+- Index on `provider_accounts(provider)` and on `integrations(provider_account_id)`.
+- Updated_at trigger on `provider_accounts` (reuses existing `update_updated_at()` function).
+- RLS enabled + admin-only policy block following the same `do $$ ... for t in select unnest(array[...])` pattern as M1.
+- Applied to live DB via Management API (HTTP 201).
+
+**Types** ([src/lib/db/types.ts](../../src/lib/db/types.ts)):
+
+- New `ProviderAccount` interface.
+- `BaseIntegration` extended with `provider_account_id: string | null`.
+- `Database.public.Tables.provider_accounts` mapping added.
+
+**Credential resolution** ([src/lib/integrations/sync.ts](../../src/lib/integrations/sync.ts)) — `resolveSecret()` now tries three paths:
+
+1. `integration.secret_ref` (explicit override, unchanged)
+2. `integration.provider_account_id → provider_accounts.master_credential_id` (new middle path — if the account exists but `master_credential_id` is null, falls through silently)
+3. Project-scoped `credentials` where `service = integration.type` (current behavior)
+
+Throws only if all three fail.
+
+**Admin UI** — new route [src/app/admin/provider-accounts/page.tsx](../../src/app/admin/provider-accounts/page.tsx) + [ProviderAccountsClient.tsx](../../src/app/admin/provider-accounts/ProviderAccountsClient.tsx):
+
+- Server component fetches `getProviderAccounts()` + `getCredentialMinis()` in parallel and hands them to the client.
+- Add dialog: provider select (`vercel | supabase | railway | github | stripe | dns | analytics`), display_name, external_account_id, master_credential_id select filtered client-side by `service === provider`.
+- Delete button on each card (with confirm).
+- No edit UI in Session A — delete + recreate per the plan.
+- Sidebar item added under "Integrations" as "Providers" (Building2 icon) — [src/components/admin/Sidebar.tsx](../../src/components/admin/Sidebar.tsx).
+- Actions [src/lib/db/actions.ts](../../src/lib/db/actions.ts): `createProviderAccount`, `deleteProviderAccount`.
+- Queries [src/lib/db/queries.ts](../../src/lib/db/queries.ts): `getProviderAccounts`, `getCredentialMinis`.
+
+**Build verified**: `npm run build` clean; `/admin/provider-accounts` registered in the route table.
+
+## What Ben needs to do before M6 Session A verification works end-to-end
+
+1. Open `/admin/provider-accounts`, click Add, register Ben's Vercel personal account (provider=`vercel`, display_name e.g. "Ben Personal (Vercel)", external_account_id = the Vercel team/personal id, master_credential_id = the existing Vercel PAT credential on Finch).
+2. Point the Finch Vercel integration at it: for now, update the `integrations` row directly (Supabase dashboard or SQL) — there's no edit-integration UI yet:
+   ```sql
+   update integrations
+   set provider_account_id = '<new provider_accounts.id>'
+   where project_id = (select id from projects where slug = 'finch')
+     and type = 'vercel';
+   ```
+3. Trigger `/api/cron/sync-vercel` (Bearer header or the Refresh button on the Vercel card). It should succeed via path 2 even if `secret_ref` is null and the project-scoped Vercel credential is removed.
 
 ### M5 — MCP writes + GitHub integration (complete)
 
@@ -59,6 +108,6 @@ All three registered in [mcp/src/index.ts](../../mcp/src/index.ts) — tools lis
 
 ## What's next
 
-**M6** — Provider accounts + credential autopull. See the plan for the data model and phased approach. Use **Opus 4.7** — multi-account data model design is non-trivial. Split into 2–3 sessions.
+**M6 Session B** — Vercel + Railway autopull endpoints. Wire `/api/cron/pull-credentials/vercel` and `/api/cron/pull-credentials/railway` using the master PATs on `provider_accounts`. Upsert into `credentials` with `project_id` set. The `source` column (for `'manual' | 'autopull'`) is still deferred — it arrives in Session C along with Supabase autopull + rotation warnings.
 
 After M6, remaining integrations are each ~1 day of Sonnet work: Supabase, Stripe, DNS, Analytics, Local dev.

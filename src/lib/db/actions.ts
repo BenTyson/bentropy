@@ -415,6 +415,37 @@ export async function deleteIntegration(id: string, projectSlug?: string) {
   revalidatePath("/admin/integrations");
 }
 
+// ===== Provider accounts =====
+
+export interface ProviderAccountInput {
+  provider: string;
+  display_name: string;
+  external_account_id: string;
+  master_credential_id?: string | null;
+}
+
+export async function createProviderAccount(input: ProviderAccountInput) {
+  const supabase = await db();
+  const { error } = await supabase.from("provider_accounts").insert({
+    provider: input.provider,
+    display_name: input.display_name,
+    external_account_id: input.external_account_id,
+    master_credential_id: nullable(input.master_credential_id),
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/provider-accounts");
+}
+
+export async function deleteProviderAccount(id: string) {
+  const supabase = await db();
+  const { error } = await supabase
+    .from("provider_accounts")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/provider-accounts");
+}
+
 export async function refreshIntegration(
   id: string,
   projectSlug?: string,

@@ -23,10 +23,11 @@ export interface SyncResult {
 }
 
 /**
- * Resolve the PAT for an integration. Prefers integration.secret_ref; falls back
- * to a project-scoped credential whose `service` matches the integration type
- * (e.g. type='vercel' → credentials.service='vercel'). Throws if no candidate
- * found or payload isn't decryptable.
+ * Resolve the PAT for an integration. Tries in order:
+ *   1. integration.secret_ref (explicit override)
+ *   2. integration.provider_account_id → provider_accounts.master_credential_id
+ *   3. Project-scoped credential whose `service` matches integration.type
+ * Throws if all three paths fail or the payload isn't decryptable.
  */
 async function resolveSecret(
   supabase: Client,
@@ -46,7 +47,35 @@ async function resolveSecret(
       );
     }
     credential = data as Credential;
-  } else {
+  }
+
+  if (!credential && integration.provider_account_id) {
+    const { data: account, error: acctErr } = await supabase
+      .from("provider_accounts")
+      .select("master_credential_id")
+      .eq("id", integration.provider_account_id)
+      .single();
+    if (acctErr || !account) {
+      throw new Error(
+        `provider_account ${integration.provider_account_id} not found`,
+      );
+    }
+    if (account.master_credential_id) {
+      const { data, error } = await supabase
+        .from("credentials")
+        .select("*")
+        .eq("id", account.master_credential_id)
+        .single();
+      if (error || !data) {
+        throw new Error(
+          `master_credential_id ${account.master_credential_id} on provider_account not found in credentials`,
+        );
+      }
+      credential = data as Credential;
+    }
+  }
+
+  if (!credential) {
     const { data, error } = await supabase
       .from("credentials")
       .select("*")
@@ -57,7 +86,7 @@ async function resolveSecret(
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) {
       throw new Error(
-        `No credential linked (integration.secret_ref is null) and no project credential with service='${integration.type}'. Create one at /admin/credentials and link it.`,
+        `No credential linked (integration.secret_ref and provider_account_id both unresolved) and no project credential with service='${integration.type}'. Create one at /admin/credentials and link it.`,
       );
     }
     credential = data[0] as Credential;

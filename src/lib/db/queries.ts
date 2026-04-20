@@ -7,6 +7,7 @@ import type {
   Login,
   Note,
   Project,
+  ProviderAccount,
   Repository,
 } from "./types";
 
@@ -204,6 +205,30 @@ export interface DashboardStats {
   runningServices: number;
   repositories: number;
   expiringCredentials: number;
+}
+
+export async function getProviderAccounts(): Promise<ProviderAccount[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("provider_accounts")
+    .select("*")
+    .order("provider", { ascending: true })
+    .order("display_name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as ProviderAccount[];
+}
+
+export async function getCredentialMinis(): Promise<
+  Pick<Credential, "id" | "name" | "service" | "project_id">[]
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("credentials")
+    .select("id, name, service, project_id")
+    .order("service", { ascending: true })
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
