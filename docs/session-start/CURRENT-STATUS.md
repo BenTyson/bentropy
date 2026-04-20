@@ -1,8 +1,35 @@
 # Current Status
 
-**Last update:** 2026-04-20 (M8 complete — DNS/Cloudflare credential autopull)
+**Last update:** 2026-04-20 (M9 complete — Analytics/Umami credential autopull)
 
 ## What's done
+
+### M9 — Analytics credential autopull (complete)
+
+**Analytics integration client** ([src/lib/integrations/analytics.ts](../../src/lib/integrations/analytics.ts)):
+- `fetchUmamiWebsites(baseUrl, username, password)` — POST `/api/auth/login` to get a bearer token, then GET `/api/websites?pageSize=999`. Handles both array and `{data: [...]}` response shapes (Umami version variance).
+
+**Analytics autopull route** ([src/app/api/cron/pull-credentials/analytics/route.ts](../../src/app/api/cron/pull-credentials/analytics/route.ts)):
+- Same shape as all prior autopull routes. Iterates `provider_accounts` where `provider='analytics'`.
+- `external_account_id` = Umami instance base URL (e.g., `https://umami-production-3685.up.railway.app`).
+- master credential = JSON string `{"username":"...","password":"..."}` (AES-GCM encrypted). Route decrypts and JSON.parses before authenticating.
+- Lists all websites under the authenticated user. For each website, matches via `integrations` where `type='analytics'` and `config->>property_id = <website.id>`.
+- Upserts `UMAMI_WEBSITE_ID` (the website UUID) with `service='analytics'`, `source='autopull'` on every matched project.
+
+**Provider account registration convention (Umami)**:
+- `provider` = `analytics`
+- `display_name` = e.g. "Ben (Umami)"
+- `external_account_id` = Umami base URL (e.g., `https://umami-production-3685.up.railway.app`)
+- `master_credential_id` → a credential whose encrypted value is: `{"username":"<umami-username>","password":"<umami-password>"}`
+
+**Integration config convention**:
+- `type` = `analytics`
+- `config.provider` = `umami`
+- `config.property_id` = Umami website UUID (the `id` field from `/api/websites`)
+
+**railway.toml** — sixth `[[cron]]` entry for `pull-credentials-analytics` on `0 */6 * * *`.
+
+**Build verified**: `npm run build` clean. `/api/cron/pull-credentials/analytics` in route table.
 
 ### M8 — DNS credential autopull (complete)
 
@@ -113,9 +140,18 @@ where project_id = (select id from projects where slug = 'finch')
 
 ## What's next
 
-**M8 is complete.** Remaining integrations each follow the established pattern (~1 Sonnet session each):
-- **Analytics** — provider-specific (Plausible, PostHog, etc.).
+**M9 is complete.** Remaining:
 - **Local dev** — manual-only, no autopull.
+
+## What Ben needs to do to verify M9
+
+**Analytics (Umami) autopull**:
+1. Create a credential in `/admin/credentials` with the Umami JSON blob as its value: `{"username":"<your-umami-username>","password":"<your-umami-password>"}`. Give it a name like `UMAMI_MASTER_CREDENTIALS`, `service=analytics`.
+2. Register an analytics provider account on `/admin/provider-accounts`: `provider=analytics`, `display_name` e.g. "Ben (Umami)", `external_account_id` = `https://umami-production-3685.up.railway.app`, `master_credential_id` = the credential from step 1.
+3. Add an `analytics` integration row on a project's detail page with `config: {"provider": "umami", "property_id": "<website-uuid>"}` (website UUID from Umami → Settings → website → Tracking code, the `data-website-id` value).
+4. `POST /api/cron/pull-credentials/analytics` with `Authorization: Bearer $CRON_SECRET`.
+5. Confirm `UMAMI_WEBSITE_ID` appears in credentials for the project with `source='autopull'` and `service='analytics'`.
+6. Re-run — expect `skipped_unchanged: 1`.
 
 ## What Ben needs to do to verify M8
 

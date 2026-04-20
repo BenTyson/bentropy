@@ -69,3 +69,8 @@ command = "curl -fsS -X POST -H \"Authorization: Bearer $CRON_SECRET\" \"https:/
 name = "pull-credentials-dns"
 schedule = "0 */6 * * *"
 command = "curl -fsS -X POST -H \"Authorization: Bearer $CRON_SECRET\" \"https://$RAILWAY_PUBLIC_DOMAIN/api/cron/pull-credentials/dns\""
+
+[[cron]]
+name = "pull-credentials-analytics"
+schedule = "0 */6 * * *"
+command = "curl -fsS -X POST -H \"Authorization: Bearer $CRON_SECRET\" \"https://$RAILWAY_PUBLIC_DOMAIN/api/cron/pull-credentials/analytics\""
