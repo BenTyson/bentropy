@@ -87,3 +87,124 @@ export async function fetchVercelDeploymentSnapshot(
     raw: latest as unknown as Record<string, unknown>,
   };
 }
+
+// --- M6 Session B: project + env autopull ----------------------------------
+
+export interface VercelProjectSummary {
+  id: string;
+  name: string;
+}
+
+interface VercelProjectsPage {
+  projects?: Array<{ id?: string; name?: string }>;
+  pagination?: { next?: number | null };
+}
+
+// Only send teamId when it looks like a real Vercel team id. Personal-account
+// PATs reject the param.
+function teamIdParam(externalAccountId: string | null | undefined): string | null {
+  if (!externalAccountId) return null;
+  return externalAccountId.startsWith("team_") ? externalAccountId : null;
+}
+
+export async function fetchVercelProjectsForAccount(
+  pat: string,
+  externalAccountId: string | null,
+): Promise<VercelProjectSummary[]> {
+  const teamId = teamIdParam(externalAccountId);
+  const out: VercelProjectSummary[] = [];
+  let until: number | null = null;
+
+  // Hard cap iterations so a broken pagination response can't loop forever.
+  for (let i = 0; i < 20; i++) {
+    const params = new URLSearchParams({ limit: "100" });
+    if (teamId) params.set("teamId", teamId);
+    if (until !== null) params.set("until", String(until));
+
+    const res = await fetch(
+      `https://api.vercel.com/v9/projects?${params.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${pat}`,
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      },
+    );
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(
+        `Vercel API ${res.status} ${res.statusText}${body ? `: ${body.slice(0, 300)}` : ""}`,
+      );
+    }
+
+    const page = (await res.json()) as VercelProjectsPage;
+    for (const p of page.projects ?? []) {
+      if (p.id && p.name) out.push({ id: p.id, name: p.name });
+    }
+    const next = page.pagination?.next ?? null;
+    if (!next) break;
+    until = next;
+  }
+
+  return out;
+}
+
+export interface VercelEnvVar {
+  key: string;
+  value: string;
+  type: string;
+  target: string[];
+}
+
+interface VercelEnvRaw {
+  key?: string;
+  value?: string | null;
+  type?: string;
+  target?: string[];
+}
+
+export async function fetchVercelProjectEnv(
+  pat: string,
+  projectId: string,
+  externalAccountId: string | null,
+): Promise<VercelEnvVar[]> {
+  const teamId = teamIdParam(externalAccountId);
+  const params = new URLSearchParams({ decrypt: "true" });
+  if (teamId) params.set("teamId", teamId);
+
+  const res = await fetch(
+    `https://api.vercel.com/v9/projects/${encodeURIComponent(projectId)}/env?${params.toString()}`,
+    {
+      headers: {
+        Authorization: `Bearer ${pat}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Vercel env API ${res.status} ${res.statusText}${body ? `: ${body.slice(0, 300)}` : ""}`,
+    );
+  }
+
+  const payload = (await res.json()) as { envs?: VercelEnvRaw[] };
+  const out: VercelEnvVar[] = [];
+  for (const e of payload.envs ?? []) {
+    if (!e.key) continue;
+    if (e.type === "system") continue;
+    if (e.type !== "encrypted" && e.type !== "plain") continue;
+    if (typeof e.value !== "string" || e.value.length === 0) continue;
+    out.push({
+      key: e.key,
+      value: e.value,
+      type: e.type,
+      target: e.target ?? [],
+    });
+  }
+  return out;
+}

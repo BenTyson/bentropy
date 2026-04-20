@@ -158,3 +158,135 @@ export async function fetchRailwayDeploymentSnapshot(
     raw: latest as unknown as Record<string, unknown>,
   };
 }
+
+// --- M6 Session B: project + variables autopull ----------------------------
+
+export interface RailwayProjectSummary {
+  id: string;
+  name: string;
+}
+
+const PROJECTS_QUERY = /* GraphQL */ `
+  query ProjectsForWorkspace($teamId: String) {
+    projects(teamId: $teamId) {
+      edges {
+        node {
+          id
+          name
+        }
+      }
+    }
+  }
+`;
+
+const VARIABLES_QUERY = /* GraphQL */ `
+  query Variables(
+    $projectId: String!
+    $environmentId: String!
+    $serviceId: String!
+  ) {
+    variables(
+      projectId: $projectId
+      environmentId: $environmentId
+      serviceId: $serviceId
+    )
+  }
+`;
+
+type RailwayAuthHeaders = Record<string, string>;
+
+async function railwayGraphql<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  pat: string,
+): Promise<T> {
+  // Account/team tokens want Authorization: Bearer. Project tokens want
+  // Project-Access-Token. Listing projects and cross-service variables both
+  // need an account/team scope — project tokens won't authorize `projects`.
+  // Try bearer first here; fall back to project-token for parity with the
+  // deployment client.
+  const body = JSON.stringify({ query, variables });
+
+  async function post(headers: RailwayAuthHeaders) {
+    const res = await fetch(RAILWAY_GRAPHQL_ENDPOINT, {
+      method: "POST",
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      cache: "no-store",
+      body,
+    });
+    const status = res.status;
+    let payload: { data?: T; errors?: Array<{ message: string }> } = {};
+    let raw = "";
+    if (status >= 200 && status < 300) {
+      payload = await res.json();
+    } else {
+      raw = await res.text().catch(() => "");
+    }
+    return { status, payload, raw };
+  }
+
+  let result = await post({ Authorization: `Bearer ${pat}` });
+  const errMsg = result.payload.errors?.map((e) => e.message).join(" ") ?? "";
+  if (
+    result.status === 401 ||
+    result.status === 403 ||
+    /not authorized|unauthorized|problem processing request/i.test(errMsg)
+  ) {
+    result = await post({ "Project-Access-Token": pat });
+  }
+
+  if (result.status < 200 || result.status >= 300) {
+    throw new Error(
+      `Railway API ${result.status}${result.raw ? `: ${result.raw.slice(0, 300)}` : ""}`,
+    );
+  }
+  if (result.payload.errors?.length) {
+    throw new Error(
+      `Railway GraphQL error: ${result.payload.errors.map((e) => e.message).join("; ")}`,
+    );
+  }
+  if (!result.payload.data) {
+    throw new Error("Railway GraphQL returned no data");
+  }
+  return result.payload.data;
+}
+
+export async function fetchRailwayProjectsForWorkspace(
+  pat: string,
+  workspaceId: string | null,
+): Promise<RailwayProjectSummary[]> {
+  const data = await railwayGraphql<{
+    projects?: { edges?: Array<{ node?: { id?: string; name?: string } }> };
+  }>(PROJECTS_QUERY, { teamId: workspaceId ?? null }, pat);
+
+  const out: RailwayProjectSummary[] = [];
+  for (const edge of data.projects?.edges ?? []) {
+    const node = edge.node;
+    if (node?.id && node?.name) out.push({ id: node.id, name: node.name });
+  }
+  return out;
+}
+
+export async function fetchRailwayVariables(
+  pat: string,
+  projectId: string,
+  environmentId: string,
+  serviceId: string,
+): Promise<Record<string, string>> {
+  const data = await railwayGraphql<{ variables?: Record<string, string> }>(
+    VARIABLES_QUERY,
+    { projectId, environmentId, serviceId },
+    pat,
+  );
+  const raw = data.variables ?? {};
+  // Railway sometimes includes null-valued keys for referenced-but-unset vars.
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof v === "string" && v.length > 0) out[k] = v;
+  }
+  return out;
+}

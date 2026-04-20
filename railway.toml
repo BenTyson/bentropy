@@ -40,3 +40,17 @@ command = "curl -fsS -X POST -H \"Authorization: Bearer $CRON_SECRET\" \"https:/
 name = "sync-github"
 schedule = "*/15 * * * *"
 command = "curl -fsS -X POST -H \"Authorization: Bearer $CRON_SECRET\" \"https://$RAILWAY_PUBLIC_DOMAIN/api/cron/sync-github\""
+
+# Credential autopull runs on a 6-hour cadence — env-var churn is rare and
+# each run walks every project under every master PAT, so pulls are more
+# expensive than the 15-min status syncs above.
+
+[[cron]]
+name = "pull-credentials-vercel"
+schedule = "0 */6 * * *"
+command = "curl -fsS -X POST -H \"Authorization: Bearer $CRON_SECRET\" \"https://$RAILWAY_PUBLIC_DOMAIN/api/cron/pull-credentials/vercel\""
+
+[[cron]]
+name = "pull-credentials-railway"
+schedule = "0 */6 * * *"
+command = "curl -fsS -X POST -H \"Authorization: Bearer $CRON_SECRET\" \"https://$RAILWAY_PUBLIC_DOMAIN/api/cron/pull-credentials/railway\""

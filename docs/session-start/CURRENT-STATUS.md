@@ -1,8 +1,33 @@
 # Current Status
 
-**Last update:** 2026-04-19 (M6 Session A complete — `provider_accounts` schema + UI + sync wired)
+**Last update:** 2026-04-19 (M6 Session B complete — Vercel + Railway credential autopull endpoints wired)
 
 ## What's done
+
+### M6 Session B — Vercel + Railway credential autopull (complete)
+
+**Client extensions**:
+
+- [src/lib/integrations/vercel.ts](../../src/lib/integrations/vercel.ts) — `fetchVercelProjectsForAccount(pat, externalAccountId)` (GET `/v9/projects` with pagination via `until` cursor, capped at 20 pages) and `fetchVercelProjectEnv(pat, projectId, externalAccountId)` (GET `/v9/projects/{id}/env?decrypt=true`). `teamId` only sent when `externalAccountId` starts with `team_` — personal PATs reject the param. Filters env to `type === "encrypted" | "plain"` with non-empty `value`; drops `system`, `secret`, `sensitive`.
+- [src/lib/integrations/railway.ts](../../src/lib/integrations/railway.ts) — `fetchRailwayProjectsForWorkspace(pat, workspaceId)` via `projects(teamId: $teamId)` query and `fetchRailwayVariables(pat, projectId, environmentId, serviceId)` via `variables` query. Shared `railwayGraphql()` helper tries `Authorization: Bearer` first, falls back to `Project-Access-Token` on auth failure (same dual-token pattern as the deployment client).
+
+**Cron routes**:
+
+- [src/app/api/cron/pull-credentials/vercel/route.ts](../../src/app/api/cron/pull-credentials/vercel/route.ts) — iterates `provider_accounts` where `provider='vercel'` and `master_credential_id is not null`, decrypts each master PAT, lists Vercel projects for the account, matches against Bentropy via `projects.vercel_project_id`, fetches env vars per matched project, and inserts new rows into `credentials` with `project_id` set. Same Bearer-token cron auth pattern as `sync-vercel`.
+- [src/app/api/cron/pull-credentials/railway/route.ts](../../src/app/api/cron/pull-credentials/railway/route.ts) — parallel shape. Railway projects lack a dedicated column on `projects`, so matching is via the existing `integrations` row where `type='railway'` and `config->>project_id = railway_api_id`; that integration also pins the `(service_id, environment_id)` used for the variables query.
+
+**Write policy (conservative, pre-`source` column)**: for every `(project_id, name)` pair, select first; if a row exists, skip and increment `skipped_existing`; only insert when absent. No updates to existing rows — Session C will add the `source` column and flip to "overwrite only where `source='autopull'`". All values `encrypt()`'d before the DB write.
+
+**Response shape** (both routes):
+```json
+{ "type": "vercel", "accounts": N, "matched_projects": N, "inserted": N,
+  "skipped_existing": N, "skipped_unmatched": N, "errors": N, "results": [...] }
+```
+Per-account error captured on `results[].error` (no throw propagates past the account loop).
+
+**railway.toml** — two new `[[cron]]` entries for `pull-credentials-vercel` and `pull-credentials-railway` on `0 */6 * * *` (6-hour cadence; autopull is heavier than the 15-min status syncs).
+
+**Build verified**: `npm run build` clean; both new routes appear in the route table.
 
 ### M6 Session A — provider_accounts schema + UI (complete)
 
@@ -106,8 +131,21 @@ All three registered in [mcp/src/index.ts](../../mcp/src/index.ts) — tools lis
 - **Deprecated `Github` icon** from `lucide-react` and the `middleware.ts → proxy.ts` Next 16 warning — cosmetic, carry-over from earlier sessions.
 - **PLACEHOLDER_* credentials from M2** still throw on sync — still need overwriting via `/admin/credentials`.
 
+## What Ben needs to do before M6 Session B verification works end-to-end
+
+1. **Vercel path** (Finch):
+   - On `/admin/provider-accounts`, the Vercel provider account from Session A must have its `external_account_id` set to the actual Vercel team id (starts with `team_`) for team PATs, or any non-`team_` string (e.g. the username) for a personal PAT — the client only sends `teamId` when it starts with `team_`.
+   - Finch's `projects.vercel_project_id` must match the Vercel API's project id (already set if Session A deploy sync works).
+   - `POST /api/cron/pull-credentials/vercel` with `Authorization: Bearer $CRON_SECRET`. Expect `matched_projects >= 1`, `inserted > 0` on first run, `skipped_existing` equal to insert count on subsequent runs, `inserted: 0`.
+   - Verify in Supabase: `select name, service from credentials where project_id = (select id from projects where slug='finch') and service='vercel' order by created_at desc;`
+
+2. **Railway path** (SaltGoat):
+   - A Railway provider account must exist on `/admin/provider-accounts` with `external_account_id` = Railway workspace id (or left blank-ish / the placeholder for personal workspace — Railway's `projects(teamId: null)` returns the caller's personal projects).
+   - SaltGoat's existing Railway integration row (`integrations.type='railway'`, `config.project_id = <Railway API id>`) is the match key — no column needed on `projects`.
+   - `POST /api/cron/pull-credentials/railway`. Same expected shape.
+
 ## What's next
 
-**M6 Session B** — Vercel + Railway autopull endpoints. Wire `/api/cron/pull-credentials/vercel` and `/api/cron/pull-credentials/railway` using the master PATs on `provider_accounts`. Upsert into `credentials` with `project_id` set. The `source` column (for `'manual' | 'autopull'`) is still deferred — it arrives in Session C along with Supabase autopull + rotation warnings.
+**M6 Session C** — Supabase autopull + rotation warnings + `source` column on `credentials` (`'manual' | 'autopull'`) so pulls can safely overwrite stale autopull rows without clobbering manual entries. Add a rotation warning log if any master PAT is > 180 days old.
 
-After M6, remaining integrations are each ~1 day of Sonnet work: Supabase, Stripe, DNS, Analytics, Local dev.
+After M6, remaining integrations are each ~1 day of Sonnet work: Stripe, DNS, Analytics, Local dev.
