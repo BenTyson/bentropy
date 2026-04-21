@@ -7,6 +7,7 @@ import type {
   Login,
   Note,
   Project,
+  ProjectStatus,
   ProviderAccount,
   Repository,
 } from "./types";
@@ -201,10 +202,24 @@ export async function getNotes(): Promise<NoteWithProject[]> {
 
 export interface DashboardStats {
   activeProjects: number;
+  totalIntegrations: number;
   totalCredentials: number;
   runningServices: number;
   repositories: number;
   expiringCredentials: number;
+  recentProjects: {
+    id: string;
+    name: string;
+    slug: string;
+    status: ProjectStatus;
+    updated_at: string;
+  }[];
+  expiringList: {
+    id: string;
+    name: string;
+    project_name: string | null;
+    expires_at: string;
+  }[];
 }
 
 export async function getProviderAccounts(): Promise<ProviderAccount[]> {
@@ -233,37 +248,76 @@ export async function getCredentialMinis(): Promise<
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   const supabase = await createClient();
+  const now = new Date().toISOString();
   const fourteenDaysOut = new Date(
     Date.now() + 14 * 24 * 60 * 60 * 1000,
   ).toISOString();
 
-  const [activeProjects, credentials, services, repos, expiring] =
-    await Promise.all([
-      supabase
-        .from("projects")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "active"),
-      supabase.from("credentials").select("id", { count: "exact", head: true }),
-      supabase
-        .from("local_services")
-        .select("id", { count: "exact", head: true })
-        .eq("is_active", true),
-      supabase
-        .from("repositories")
-        .select("id", { count: "exact", head: true }),
-      supabase
-        .from("credentials")
-        .select("id", { count: "exact", head: true })
-        .not("expires_at", "is", null)
-        .lte("expires_at", fourteenDaysOut)
-        .gte("expires_at", new Date().toISOString()),
-    ]);
+  const [
+    activeProjects,
+    credentials,
+    services,
+    repos,
+    expiringCount,
+    integrations,
+    recentProjectsData,
+    expiringListData,
+  ] = await Promise.all([
+    supabase
+      .from("projects")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active"),
+    supabase.from("credentials").select("id", { count: "exact", head: true }),
+    supabase
+      .from("local_services")
+      .select("id", { count: "exact", head: true })
+      .eq("is_active", true),
+    supabase
+      .from("repositories")
+      .select("id", { count: "exact", head: true }),
+    supabase
+      .from("credentials")
+      .select("id", { count: "exact", head: true })
+      .not("expires_at", "is", null)
+      .lte("expires_at", fourteenDaysOut)
+      .gte("expires_at", now),
+    supabase.from("integrations").select("id", { count: "exact", head: true }),
+    supabase
+      .from("projects")
+      .select("id, slug, name, status, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("credentials")
+      .select("id, name, expires_at, projects(name)")
+      .not("expires_at", "is", null)
+      .lte("expires_at", fourteenDaysOut)
+      .gte("expires_at", now)
+      .order("expires_at", { ascending: true })
+      .limit(8),
+  ]);
 
   return {
     activeProjects: activeProjects.count ?? 0,
+    totalIntegrations: integrations.count ?? 0,
     totalCredentials: credentials.count ?? 0,
     runningServices: services.count ?? 0,
     repositories: repos.count ?? 0,
-    expiringCredentials: expiring.count ?? 0,
+    expiringCredentials: expiringCount.count ?? 0,
+    recentProjects: (recentProjectsData.data ?? []) as DashboardStats["recentProjects"],
+    expiringList: (expiringListData.data ?? []).map((row) => {
+      const { projects: proj, ...rest } = row as unknown as {
+        id: string;
+        name: string;
+        expires_at: string | null;
+        projects: { name: string } | null;
+      };
+      return {
+        id: rest.id,
+        name: rest.name,
+        project_name: proj?.name ?? null,
+        expires_at: rest.expires_at!,
+      };
+    }),
   };
 }

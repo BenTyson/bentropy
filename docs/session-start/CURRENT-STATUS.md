@@ -1,6 +1,6 @@
 # Current Status
 
-**Last update:** 2026-04-20 (Inline edit complete — all entities now have edit paths)
+**Last update:** 2026-04-20 (Admin redesign Phase 3a — Overview page ported)
 
 ## What's done
 
@@ -152,6 +152,21 @@ where project_id = (select id from projects where slug = 'finch')
 ### M1 — DB + admin wired (complete)
 
 ## What's shipped (this session)
+
+### Admin redesign Phase 3a — Overview page
+
+**DashboardClient.tsx** ([src/app/admin/DashboardClient.tsx](../../src/app/admin/DashboardClient.tsx)):
+- Full rewrite. Dropped: `"use client"`, `framer-motion`, entropy meter, gradient hero, "Command Center" heading, colored StatCards.
+- Now a server component. Renders: `<h1>Overview</h1>` header, 4-cell `StatRow` (Active projects / Integrations / Credentials / Services), 2-col panel grid.
+- Left col: Recent projects panel (last 5 by `updated_at`, `StatusDot` health, `Pill` status, mono relative time) + Activity panel (empty state + `// TODO: wire activity feed`).
+- Right col: Attention panel (expiring credentials list with `Pill tone="warn"`, project name, days-until; empty state "All credentials healthy.") + Shortcuts panel (4 `KeyHint` rows: ⌘K, ⌘N, G P, G C).
+- Credentials stat shows amber delta `"N expiring"` when `expiringCredentials > 0`.
+
+**queries.ts** ([src/lib/db/queries.ts](../../src/lib/db/queries.ts)):
+- `DashboardStats` extended with `totalIntegrations`, `recentProjects[]`, `expiringList[]`.
+- `getDashboardStats()` now runs 8 parallel queries (was 5): adds integrations count, last-5 projects, top-8 expiring credentials joined with project name.
+
+**Build verified**: `npm run build` clean.
 
 ### Inline edit — all entities
 
