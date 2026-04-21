@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IntegrationCard } from "@/components/admin/IntegrationCard";
+import { Pill } from "@/components/admin/Pill";
+import type { PillTone } from "@/components/admin/Pill";
 import { getProjectBySlug } from "@/lib/db/queries";
 import type { Integration, ProjectStatus } from "@/lib/db/types";
 
@@ -21,10 +23,10 @@ type LocalDevEntry = {
 
 export const dynamic = "force-dynamic";
 
-const statusColors: Record<ProjectStatus, string> = {
-  active: "bg-accent-blue text-white",
-  shipped: "bg-entropy-ordered text-white",
-  concept: "bg-muted text-muted-foreground",
+const statusTone: Record<ProjectStatus, PillTone> = {
+  active: "active",
+  shipped: "shipped",
+  concept: "concept",
 };
 
 export default async function ProjectDetailPage({
@@ -80,7 +82,7 @@ export default async function ProjectDetailPage({
               <CardTitle className="text-2xl">{project.name}</CardTitle>
               <p className="text-muted-foreground">{project.tagline}</p>
             </div>
-            <Badge className={statusColors[project.status]}>{project.status}</Badge>
+            <Pill tone={statusTone[project.status]}>{project.status}</Pill>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -91,7 +93,7 @@ export default async function ProjectDetailPage({
                   href={`https://${project.primary_domain}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-sm text-accent-blue hover:underline"
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors hover:underline"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   {project.primary_domain}
@@ -102,7 +104,7 @@ export default async function ProjectDetailPage({
                   href={project.demo_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-sm text-accent-blue hover:underline"
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors hover:underline"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   Demo
@@ -201,7 +203,7 @@ export default async function ProjectDetailPage({
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs font-mono text-muted-foreground">••••••••</span>
+                    <span className="text-xs font-[var(--font-admin-mono)] text-muted-foreground">••••••••</span>
                     {cred.expires_at && (
                       <Badge variant="outline" className="text-xs">
                         exp {new Date(cred.expires_at).toLocaleDateString()}
@@ -246,7 +248,7 @@ export default async function ProjectDetailPage({
                     href={repo.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-accent-blue hover:underline shrink-0"
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors hover:underline shrink-0"
                   >
                     <Github className="w-3 h-3" />
                     {repo.url.replace("https://github.com/", "")}
@@ -287,7 +289,7 @@ export default async function ProjectDetailPage({
                   <div className="min-w-0">
                     <div className="font-medium text-sm">{entry.name}</div>
                     {entry.startCommand && (
-                      <div className="text-xs font-mono text-muted-foreground mt-0.5">
+                      <div className="text-xs font-[var(--font-admin-mono)] text-muted-foreground mt-0.5">
                         {entry.startCommand}
                       </div>
                     )}
@@ -300,17 +302,14 @@ export default async function ProjectDetailPage({
                       href={`http://localhost:${entry.port}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs font-mono text-accent-blue hover:underline"
+                      className="text-xs font-[var(--font-admin-mono)] [font-variant-numeric:tabular-nums] text-muted-foreground hover:text-foreground hover:underline transition-colors"
                     >
                       :{entry.port}
                     </a>
                     {entry.isActive !== null && (
-                      <Badge
-                        className={entry.isActive ? "bg-entropy-ordered text-white" : ""}
-                        variant={entry.isActive ? "default" : "outline"}
-                      >
+                      <Pill tone={entry.isActive ? "active" : "concept"}>
                         {entry.isActive ? "running" : "stopped"}
-                      </Badge>
+                      </Pill>
                     )}
                   </div>
                 </div>
@@ -338,7 +337,7 @@ export default async function ProjectDetailPage({
                   <div className="flex items-center gap-2 mb-1">
                     <div className="font-medium text-sm">{note.title}</div>
                     {note.pinned && (
-                      <Badge className="text-xs bg-accent-blue text-white">pinned</Badge>
+                      <Pill>pinned</Pill>
                     )}
                   </div>
                   {note.content && (

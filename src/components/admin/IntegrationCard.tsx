@@ -10,8 +10,9 @@ import {
   Triangle,
 } from "lucide-react";
 import type { ComponentType } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Pill } from "@/components/admin/Pill";
+import type { PillTone } from "@/components/admin/Pill";
 import type { Integration, IntegrationType, SyncStatus } from "@/lib/db/types";
 import { refreshIntegration } from "@/lib/db/actions";
 import { RefreshButton } from "./RefreshButton";
@@ -31,10 +32,10 @@ const typeMeta: Record<
   local: { label: "Local", icon: Terminal },
 };
 
-const statusColors: Record<SyncStatus, string> = {
-  ok: "bg-entropy-ordered text-white",
-  stale: "bg-entropy-drifting text-white",
-  error: "bg-entropy-chaos text-white",
+const statusTone: Record<SyncStatus, PillTone> = {
+  ok: "active",
+  stale: "warn",
+  error: "bad",
 };
 
 function formatRelative(iso: string | null): string {
@@ -97,9 +98,9 @@ export function IntegrationCard({
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {status ? (
-              <Badge className={statusColors[status]}>{status}</Badge>
+              <Pill tone={statusTone[status]}>{status}</Pill>
             ) : (
-              <Badge variant="outline">pending</Badge>
+              <Pill tone="concept">pending</Pill>
             )}
             <IntegrationEditButton
               integration={integration}
@@ -110,7 +111,7 @@ export function IntegrationCard({
       </CardHeader>
       <CardContent className="space-y-3">
         {summary && (
-          <div className="text-xs font-mono text-muted-foreground truncate">
+          <div className="text-xs font-[var(--font-admin-mono)] text-muted-foreground truncate">
             {summary}
           </div>
         )}
