@@ -1,6 +1,6 @@
 # Current Status
 
-**Last update:** 2026-04-20 (Admin redesign Phase 3c — Credentials page ported)
+**Last update:** 2026-04-20 (Admin redesign Phase 3d — all remaining pages ported)
 
 ## What's done
 
@@ -152,6 +152,37 @@ where project_id = (select id from projects where slug = 'finch')
 ### M1 — DB + admin wired (complete)
 
 ## What's shipped (this session)
+
+### Admin redesign Phase 3d — Remaining pages
+
+**LoginsClient.tsx** ([src/app/admin/logins/LoginsClient.tsx](../../src/app/admin/logins/LoginsClient.tsx)):
+- Full rewrite. Dropped: `framer-motion`, card grid, `Card`/`Badge`/`Button`, colored icons, `Lock`/`User` decorations.
+- Dense Panel table. Columns: Service (ServiceDot + name) / Username (masked, mono) / URL (mono, truncated) / Category (Tag) / Last used (mono relative) / Actions (eye, copy-user, copy-pass, edit, delete).
+- `revealLogin(id)` server action added to `actions.ts` — decrypts both `username_encrypted` and `password_encrypted`, returns `{ username, password }`.
+- `updateLogin` fixed: blank username/password fields skip re-encryption (was double-encrypting ciphertext on edit).
+- Filter bar: search by service/URL + `SegControl` All + used-categories (dynamic options).
+- Edit form: username/password start blank with "Leave blank to keep current" placeholder.
+
+**ServicesClient.tsx** ([src/app/admin/services/ServicesClient.tsx](../../src/app/admin/services/ServicesClient.tsx)):
+- Full rewrite. Dense Panel table. Columns: Name / Project / Port (mono) / Status (StatusDot + label) / Start command (mono, truncated) / Actions (play/stop, edit, delete).
+- Removed: active-count banner, colored card borders, `entropy-ordered` tokens.
+- Filter: search by name/project.
+
+**ReposClient.tsx** ([src/app/admin/repos/ReposClient.tsx](../../src/app/admin/repos/ReposClient.tsx)):
+- Full rewrite. Dense Panel table. Columns: Name (clickable link) / Project / Provider (ServiceDot inferred from URL) / Branch (— placeholder, no DB field) / Updated (mono relative) / Actions (edit, delete).
+- Removed: category-badge filters, card grid, `Github` icon header.
+
+**NotesClient.tsx** ([src/app/admin/notes/NotesClient.tsx](../../src/app/admin/notes/NotesClient.tsx)):
+- Full rewrite. Dense Panel table. Columns: Title (+ truncated content) / Project / Tags (Tag chips) / Updated (mono relative) / Actions (pin toggle, edit, delete).
+- Removed: card grid, colored pin accent, `accent-blue` borders on pinned cards.
+- Filter: search by title/project/tags.
+
+**ProviderAccountsClient.tsx** ([src/app/admin/provider-accounts/ProviderAccountsClient.tsx](../../src/app/admin/provider-accounts/ProviderAccountsClient.tsx)):
+- Full rewrite. Dense Panel table. Columns: Provider (ServiceDot + Tag) / Display name / External account ID (mono, truncated) / Master credential / Actions (edit, delete).
+- Removed: `framer-motion`, card grid, `motion.div`, `Card`/`Badge`/`Button`.
+- Edit: provider shown as read-only ServiceDot + name (no select change post-creation).
+
+**Build verified**: `npm run build` clean.
 
 ### Admin redesign Phase 3c — Credentials page
 

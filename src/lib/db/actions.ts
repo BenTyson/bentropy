@@ -305,19 +305,31 @@ export async function createLogin(input: LoginInput) {
 
 export async function updateLogin(id: string, input: LoginInput) {
   const supabase = await db();
-  const { error } = await supabase
-    .from("logins")
-    .update({
-      service: input.service,
-      username_encrypted: encrypt(input.username),
-      password_encrypted: encrypt(input.password),
-      url: nullable(input.url),
-      category: nullable(input.category),
-      notes: nullable(input.notes),
-    })
-    .eq("id", id);
+  const updateData: Record<string, unknown> = {
+    service: input.service,
+    url: nullable(input.url),
+    category: nullable(input.category),
+    notes: nullable(input.notes),
+  };
+  if (input.username) updateData.username_encrypted = encrypt(input.username);
+  if (input.password) updateData.password_encrypted = encrypt(input.password);
+  const { error } = await supabase.from("logins").update(updateData).eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/admin/logins");
+}
+
+export async function revealLogin(id: string): Promise<{ username: string; password: string }> {
+  const supabase = await db();
+  const { data, error } = await supabase
+    .from("logins")
+    .select("username_encrypted, password_encrypted")
+    .eq("id", id)
+    .single();
+  if (error) throw new Error(error.message);
+  return {
+    username: decrypt(data.username_encrypted),
+    password: decrypt(data.password_encrypted),
+  };
 }
 
 export async function deleteLogin(id: string) {

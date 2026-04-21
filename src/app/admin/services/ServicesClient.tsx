@@ -2,18 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -22,18 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Plus,
-  Server,
-  ExternalLink,
-  Copy,
-  Check,
-  Pencil,
-  Trash2,
-  Play,
-  Square,
-  Terminal,
-} from "lucide-react";
+import { Plus, Play, Square, Pencil, Trash2 } from "lucide-react";
 import type { LocalServiceWithProject } from "@/lib/db/queries";
 import {
   createService,
@@ -42,10 +26,15 @@ import {
   updateService,
   type ServiceInput,
 } from "@/lib/db/actions";
+import { Panel } from "@/components/admin/Panel";
+import { Btn } from "@/components/admin/Btn";
+import { IconBtn } from "@/components/admin/IconBtn";
+import { StatusDot } from "@/components/admin/StatusDot";
 
 type ProjectMini = { id: string; name: string };
 
 const NONE = "__none__";
+const COL = "minmax(140px,1fr) 110px 64px 100px minmax(140px,1fr) 80px";
 
 interface FormState {
   name: string;
@@ -88,9 +77,16 @@ export function ServicesClient({
   const [editing, setEditing] = useState<LocalServiceWithProject | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [error, setError] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
-  const services = initial;
+  const filtered = initial.filter((s) => {
+    const q = search.toLowerCase();
+    return (
+      !q ||
+      s.name.toLowerCase().includes(q) ||
+      (s.project_name ?? "").toLowerCase().includes(q)
+    );
+  });
 
   function openCreate() {
     setEditing(null);
@@ -156,253 +152,180 @@ export function ServicesClient({
     });
   }
 
-  async function copyCommand(id: string, command: string) {
-    await navigator.clipboard.writeText(command);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  }
-
-  const activeCount = services.filter((s) => s.is_active).length;
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl font-bold">Local Services</h1>
-          <p className="text-muted-foreground">
-            Track dev servers and local ports.
-          </p>
-        </motion.div>
-
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openCreate}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Service
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>
-                {editing ? "Edit Service" : "Add Service"}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Name">
-                  <Input
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="My Dev Server"
-                  />
-                </Field>
-                <Field label="Port">
-                  <Input
-                    type="number"
-                    value={form.port}
-                    onChange={(e) => setForm({ ...form, port: e.target.value })}
-                    placeholder="3000"
-                  />
-                </Field>
-              </div>
-
-              <Field label="Project">
-                <Select
-                  value={form.project_id}
-                  onValueChange={(value) =>
-                    setForm({ ...form, project_id: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="None" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>None</SelectItem>
-                    {projects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field label="Start Command">
-                <Input
-                  value={form.start_command}
-                  onChange={(e) =>
-                    setForm({ ...form, start_command: e.target.value })
-                  }
-                  placeholder="npm run dev"
-                  className="font-mono text-sm"
-                />
-              </Field>
-
-              <Field label="Notes">
-                <Textarea
-                  value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  rows={2}
-                />
-              </Field>
-
-              {error && <p className="text-sm text-destructive">{error}</p>}
-
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={save} disabled={pending}>
-                  {pending ? "Saving..." : editing ? "Save Changes" : "Add Service"}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-[22px] font-medium text-ink leading-tight" style={{ letterSpacing: "-0.3px" }}>
+          Services
+        </h1>
+        <Btn icon={<Plus size={14} />} onClick={openCreate}>
+          New service
+        </Btn>
       </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className={`p-4 rounded-lg flex items-center gap-3 ${
-          activeCount > 0
-            ? "bg-entropy-ordered/10 border border-entropy-ordered/30"
-            : "bg-surface-1 border border-border"
-        }`}
-      >
-        <Server
-          className={`w-5 h-5 ${
-            activeCount > 0 ? "text-entropy-ordered" : "text-muted-foreground"
-          }`}
-        />
-        <span className="text-sm">
-          <strong>{activeCount}</strong> service{activeCount !== 1 ? "s" : ""} running
-        </span>
-      </motion.div>
 
       {error && !isDialogOpen && (
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="text-[13px] mb-4" style={{ color: "var(--red)" }}>{error}</p>
       )}
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {services.map((s, index) => (
-          <motion.div
-            key={s.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-          >
-            <Card className={s.is_active ? "border-entropy-ordered/50" : ""}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        s.is_active
-                          ? "bg-entropy-ordered animate-pulse"
-                          : "bg-muted-foreground"
-                      }`}
-                    />
-                    <CardTitle className="text-base">{s.name}</CardTitle>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => toggleActive(s.id, s.is_active)}
-                      disabled={pending}
-                    >
-                      {s.is_active ? (
-                        <Square className="w-3 h-3" />
-                      ) : (
-                        <Play className="w-3 h-3" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => openEdit(s)}
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => remove(s.id)}
-                      disabled={pending}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    className="font-mono text-lg px-3 py-1"
-                  >
-                    :{s.port}
-                  </Badge>
-                  <a
-                    href={`http://localhost:${s.port}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent-blue hover:underline flex items-center gap-1 text-sm"
-                  >
-                    Open <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-
-                {s.start_command && (
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 text-xs bg-surface-1 p-2 rounded font-mono truncate flex items-center gap-2">
-                      <Terminal className="w-3 h-3 text-muted-foreground" />
-                      {s.start_command}
-                    </code>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => copyCommand(s.id, s.start_command!)}
-                    >
-                      {copiedId === s.id ? (
-                        <Check className="w-3 h-3 text-entropy-ordered" />
-                      ) : (
-                        <Copy className="w-3 h-3" />
-                      )}
-                    </Button>
-                  </div>
-                )}
-
-                {s.project_name && (
-                  <div className="text-xs text-muted-foreground">
-                    Project: {s.project_name}
-                  </div>
-                )}
-
-                {s.notes && (
-                  <p className="text-xs text-muted-foreground">{s.notes}</p>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
+      <div className="flex items-center gap-3 mb-3">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search services..."
+          className="h-8 w-56 px-3 rounded-[var(--radius-admin-lg)] border border-line bg-surface-panel text-[13px] text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
+        />
       </div>
 
-      {services.length === 0 && (
-        <div className="text-center py-12">
-          <Server className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground mb-4">No services tracked yet</p>
-          <Button onClick={openCreate}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add your first service
-          </Button>
+      <Panel pad={false}>
+        <div
+          className="grid items-center px-4 py-2.5 border-b border-line text-[11px] font-medium uppercase tracking-[0.4px] text-ink-muted"
+          style={{ background: "var(--bg)", gridTemplateColumns: COL }}
+        >
+          <span>Name</span>
+          <span>Project</span>
+          <span>Port</span>
+          <span>Status</span>
+          <span>Start command</span>
+          <span />
         </div>
-      )}
+
+        {initial.length === 0 ? (
+          <div className="flex items-center gap-3 px-4 py-3">
+            <span className="text-[13px] text-ink-muted">No services yet.</span>
+            <Btn size="sm" icon={<Plus size={12} />} onClick={openCreate}>New service</Btn>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="px-4 py-3 text-[13px] text-ink-muted">No matching services.</div>
+        ) : (
+          <ul>
+            {filtered.map((s, i) => (
+              <li key={s.id} className={`group ${i > 0 ? "border-t border-line" : ""}`}>
+                <div
+                  className="grid items-center px-4 py-3 hover:bg-[rgba(255,255,255,0.015)] transition-colors duration-100"
+                  style={{ gridTemplateColumns: COL }}
+                >
+                  <span className="text-[13px] text-ink truncate pr-3">{s.name}</span>
+
+                  <span className="text-[13px] text-ink-muted truncate pr-3">
+                    {s.project_name ?? <span className="text-ink-faint">—</span>}
+                  </span>
+
+                  <span
+                    className="text-[11px] text-ink-faint pr-3"
+                    style={{ fontFamily: "var(--font-admin-mono)", fontVariantNumeric: "tabular-nums" }}
+                  >
+                    :{s.port}
+                  </span>
+
+                  <div className="flex items-center gap-1.5 pr-3">
+                    <StatusDot tone={s.is_active ? "green" : "muted"} />
+                    <span className="text-[12px] text-ink-muted">
+                      {s.is_active ? "running" : "stopped"}
+                    </span>
+                  </div>
+
+                  <span
+                    className="text-[11px] text-ink-faint truncate pr-3"
+                    style={{ fontFamily: "var(--font-admin-mono)" }}
+                  >
+                    {s.start_command || "—"}
+                  </span>
+
+                  <div className="flex items-center gap-0.5 justify-end opacity-30 group-hover:opacity-100 transition-opacity duration-100">
+                    <IconBtn
+                      icon={s.is_active ? <Square size={13} strokeWidth={1.5} /> : <Play size={13} strokeWidth={1.5} />}
+                      onClick={() => toggleActive(s.id, s.is_active)}
+                      disabled={pending}
+                      title={s.is_active ? "Stop" : "Start"}
+                    />
+                    <IconBtn
+                      icon={<Pencil size={13} strokeWidth={1.5} />}
+                      onClick={() => openEdit(s)}
+                      title="Edit"
+                    />
+                    <IconBtn
+                      icon={<Trash2 size={13} strokeWidth={1.5} />}
+                      danger
+                      onClick={() => remove(s.id)}
+                      disabled={pending}
+                      title="Delete"
+                    />
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Edit service" : "New service"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Name">
+                <Input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="My Dev Server"
+                />
+              </Field>
+              <Field label="Port">
+                <Input
+                  type="number"
+                  value={form.port}
+                  onChange={(e) => setForm({ ...form, port: e.target.value })}
+                  placeholder="3000"
+                />
+              </Field>
+            </div>
+
+            <Field label="Project">
+              <Select
+                value={form.project_id}
+                onValueChange={(v) => setForm({ ...form, project_id: v })}
+              >
+                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>None</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <Field label="Start command">
+              <Input
+                value={form.start_command}
+                onChange={(e) => setForm({ ...form, start_command: e.target.value })}
+                placeholder="npm run dev"
+                className="font-mono text-sm"
+              />
+            </Field>
+
+            <Field label="Notes">
+              <Textarea
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                rows={2}
+              />
+            </Field>
+
+            {error && <p className="text-sm" style={{ color: "var(--red)" }}>{error}</p>}
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Btn variant="secondary" onClick={() => setIsDialogOpen(false)}>Cancel</Btn>
+              <Btn onClick={save} disabled={pending}>
+                {pending ? "Saving..." : editing ? "Save changes" : "Add service"}
+              </Btn>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -410,7 +333,7 @@ export function ServicesClient({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium">{label}</label>
+      <label className="text-sm font-medium text-ink-muted">{label}</label>
       {children}
     </div>
   );
