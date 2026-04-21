@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { encrypt } from "@/lib/crypto";
+import { decrypt, encrypt } from "@/lib/crypto";
 import { syncIntegrationById } from "@/lib/integrations/sync";
 import type {
   IntegrationConfigFor,
@@ -135,21 +135,30 @@ export async function createCredential(input: CredentialInput) {
 
 export async function updateCredential(id: string, input: CredentialInput) {
   const supabase = await db();
-  const { error } = await supabase
-    .from("credentials")
-    .update({
-      name: input.name,
-      service: input.service,
-      key_encrypted: encrypt(input.key),
-      project_id: nullable(input.project_id),
-      expires_at: input.expires_at
-        ? new Date(input.expires_at).toISOString()
-        : null,
-      notes: nullable(input.notes),
-    })
-    .eq("id", id);
+  const patch: Record<string, unknown> = {
+    name: input.name,
+    service: input.service,
+    project_id: nullable(input.project_id),
+    expires_at: input.expires_at
+      ? new Date(input.expires_at).toISOString()
+      : null,
+    notes: nullable(input.notes),
+  };
+  if (input.key.trim()) patch.key_encrypted = encrypt(input.key);
+  const { error } = await supabase.from("credentials").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/admin/credentials");
+}
+
+export async function revealCredential(id: string): Promise<string> {
+  const supabase = await db();
+  const { data, error } = await supabase
+    .from("credentials")
+    .select("key_encrypted")
+    .eq("id", id)
+    .single();
+  if (error) throw new Error(error.message);
+  return decrypt(data.key_encrypted);
 }
 
 export async function deleteCredential(id: string) {

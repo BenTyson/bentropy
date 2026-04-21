@@ -1,6 +1,6 @@
 # Current Status
 
-**Last update:** 2026-04-20 (Admin redesign Phase 3a — Overview page ported)
+**Last update:** 2026-04-20 (Admin redesign Phase 3c — Credentials page ported)
 
 ## What's done
 
@@ -152,6 +152,44 @@ where project_id = (select id from projects where slug = 'finch')
 ### M1 — DB + admin wired (complete)
 
 ## What's shipped (this session)
+
+### Admin redesign Phase 3c — Credentials page
+
+**CredentialsClient.tsx** ([src/app/admin/credentials/CredentialsClient.tsx](../../src/app/admin/credentials/CredentialsClient.tsx)):
+- Full rewrite. Dropped: `framer-motion`, `motion.div` entry animations, 3-column card grid, shadcn `Card`/`Badge`/`Button`, `entropy-*` color tokens, `Key` icon decoration.
+- Now uses: `Panel`, `Btn`, `IconBtn`, `Pill`, `Tag`, `ServiceDot`, `SegControl` from the new design system.
+- Alert banner: renders only when `expiredCount > 0` OR `expiringSoonCount > 0`. One line per condition (red for expired, amber for expiring). Suppressed entirely when all healthy.
+- Filter bar: search input (left) + `SegControl All/Manual/Autopull` (right), client-side filtering by name/project.
+- 6-column CSS grid: Name (+ masked key, mono) / Service (ServiceDot + name) / Project / Source (Tag) / Expires countdown / Actions.
+- Expiry countdown: `≤14d` → amber `Pill`, expired → bad `Pill "Expired Xd ago"`, never/far → plain mono text.
+- Show/hide: calls `revealCredential(id)` server action to AES-decrypt on demand; stores plaintext in `revealedKeys` state. Hide clears the entry.
+- Copy: decrypts on demand if not already revealed, copies plaintext, shows `Check` icon for 2s.
+- Row hover: `rgba(255,255,255,0.015)`, 100ms. Row actions: `opacity-30` rest, `group-hover:opacity-100`.
+- Edit dialog: key field starts blank with "Leave blank to keep current" placeholder.
+- Empty state: "No credentials yet." + New credential Btn (zero data) vs "No matching credentials." (filtered).
+
+**actions.ts** ([src/lib/db/actions.ts](../../src/lib/db/actions.ts)):
+- Added `revealCredential(id)` server action: queries `key_encrypted`, calls `decrypt()`, returns plaintext. Auth-gated via `createClient()`.
+- `updateCredential`: now skips `key_encrypted` update when `input.key` is blank (fixes prior double-encrypt bug when editing).
+
+**Build verified**: `npm run build` clean.
+
+### Admin redesign Phase 3b — Projects list page
+
+**ProjectsClient.tsx** ([src/app/admin/projects/ProjectsClient.tsx](../../src/app/admin/projects/ProjectsClient.tsx)):
+- Full rewrite. Dropped: `framer-motion`, `statusColors` badge map, shadcn `Button`/`Badge`/`Table/*`, `Eye` action, `ExternalLink`/`Github` icon columns, `tone` prop on `Field` (removed `text-entropy-chaos` etc.).
+- Now uses: `Panel`, `Btn`, `IconBtn`, `Pill`, `StatusDot`, `SegControl` from the new design system.
+- Filter bar: search input (left) + `SegControl All/Active/Shipped/Concept` (right), client-side filtering.
+- 7-column CSS grid: star / name+tagline / domain / status / health / updated / actions.
+- Column header row with `var(--bg)` fill, 11px uppercase labels.
+- `rgba(255,255,255,0.015)` row hover, 100ms transition. Row actions at `opacity-30 group-hover:opacity-100`.
+- Star: `var(--accent)` when featured, `var(--faint)` otherwise.
+- `StatusDot tone="green"` hardcoded for Health column (no live health data yet).
+- Two-state empty: "No projects yet." + New project Btn (zero data) vs "No matching projects." (filtered).
+- Dialog kept; field labels stripped of tone-color variants → plain `text-ink-muted`.
+- Dialog buttons switched to `Btn` primary/secondary.
+
+**Build verified**: `npm run build` clean.
 
 ### Admin redesign Phase 3a — Overview page
 
