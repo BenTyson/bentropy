@@ -1,0 +1,123 @@
+/* ============================================================
+   Bentropy Admin — Design Tokens
+   Scoped to [data-surface="admin"] so they never leak into the
+   public marketing site. Switch palettes at runtime by setting
+   data-palette on the same element:
+     <div data-surface="admin" data-palette="slate">
+   ============================================================ */
+
+[data-surface="admin"],
+[data-surface="admin"][data-palette="claret"] {
+  --bg:            #110E11;
+  --panel:         #18141A;
+  --panel-hi:      #211B24;
+  --border:        #2A2430;
+  --border-strong: #352D3C;
+
+  --text:          #EBE4E8;
+  --muted:         #968A95;
+  --faint:         #5A525A;
+
+  --accent:        #E8DDD8;
+  --accent-fg:     var(--bg);
+
+  --amber: #D4A547;
+  --red:   #D4584F;
+  --green: #4F9F7F;
+}
+
+[data-surface="admin"][data-palette="void"] {
+  --bg: #0B0B0D; --panel: #111114; --panel-hi: #17171B;
+  --border: #1F1F24; --border-strong: #2A2A31;
+  --text: #E6E6E9; --muted: #8A8A92; --faint: #54545C;
+  --accent: #E8E4D8;
+  --amber: #D4A547; --red: #D4584F; --green: #4F9F7F;
+  --accent-fg: var(--bg);
+}
+[data-surface="admin"][data-palette="charcoal"] {
+  --bg: #131312; --panel: #1A1A18; --panel-hi: #22221F;
+  --border: #2A2A27; --border-strong: #363632;
+  --text: #EAE8E0; --muted: #948F80; --faint: #5A554A;
+  --accent: #E8E4D8;
+  --amber: #D4A547; --red: #D4584F; --green: #4F9F7F;
+  --accent-fg: var(--bg);
+}
+[data-surface="admin"][data-palette="slate"] {
+  --bg: #0E1116; --panel: #141821; --panel-hi: #1B2030;
+  --border: #222838; --border-strong: #2D3446;
+  --text: #E3E6EC; --muted: #8A92A3; --faint: #525A6B;
+  --accent: #E8E4D8;
+  --amber: #D4A547; --red: #D4584F; --green: #4F9F7F;
+  --accent-fg: var(--bg);
+}
+[data-surface="admin"][data-palette="midnight"] {
+  --bg: #0C0D15; --panel: #13141F; --panel-hi: #1B1D2C;
+  --border: #232539; --border-strong: #2E3148;
+  --text: #E5E5EC; --muted: #8A8AA0; --faint: #525268;
+  --accent: #E8E4D8;
+  --amber: #D4A547; --red: #D4584F; --green: #4F9F7F;
+  --accent-fg: var(--bg);
+}
+[data-surface="admin"][data-palette="forest"] {
+  --bg: #0C110F; --panel: #121814; --panel-hi: #1A211C;
+  --border: #222A24; --border-strong: #2E3730;
+  --text: #E4E8E4; --muted: #8A9390; --faint: #525A54;
+  --accent: #E4E8D8;
+  --amber: #D4A547; --red: #D4584F; --green: #4F9F7F;
+  --accent-fg: var(--bg);
+}
+[data-surface="admin"][data-palette="sand"] {
+  --bg: #13110E; --panel: #1B1814; --panel-hi: #24201B;
+  --border: #2E2923; --border-strong: #3B352D;
+  --text: #EBE6DA; --muted: #96907F; --faint: #5A5446;
+  --accent: #E8DEC8;
+  --amber: #D4A547; --red: #D4584F; --green: #4F9F7F;
+  --accent-fg: var(--bg);
+}
+
+/* ---------- typography & motion (palette-agnostic) ---------- */
+[data-surface="admin"] {
+  --font-sans-admin: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono-admin: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --fs-xs:   11px;
+  --fs-sm:   12px;
+  --fs-base: 13px;
+  --fs-md:   14px;
+  --fs-lg:   22px;
+  --fs-xl:   30px;
+
+  --r-sm: 3px;
+  --r-md: 4px;
+  --r-lg: 5px;
+  --r-xl: 6px;
+  --r-2xl: 8px;
+  --r-3xl: 10px;
+
+  --shadow-popover: 0 20px 60px rgba(0,0,0,.5);
+  --shadow-float:   0 12px 40px rgba(0,0,0,.5);
+
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 100ms;
+  --dur-med:  160ms;
+
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans-admin);
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* number-heavy inline helpers */
+[data-surface="admin"] .num,
+[data-surface="admin"] code,
+[data-surface="admin"] kbd {
+  font-family: var(--font-mono-admin);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-surface="admin"] ::selection {
+  background: color-mix(in oklab, var(--accent) 30%, transparent);
+  color: var(--text);
+}

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "../styles/admin-tokens.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -113,6 +114,29 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Admin design system — token-backed utilities (only used inside [data-surface="admin"]) */
+  --color-surface-bg: var(--bg);
+  --color-surface-panel: var(--panel);
+  --color-surface-panel-hi: var(--panel-hi);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-ink: var(--text);
+  --color-ink-muted: var(--muted);
+  --color-ink-faint: var(--faint);
+  --color-bone: var(--accent);
+  --color-bone-fg: var(--accent-fg);
+  --color-signal-amber: var(--amber);
+  --color-signal-red: var(--red);
+  --color-signal-green: var(--green);
+  --font-admin-sans: var(--font-inter);
+  --font-admin-mono: var(--font-jetbrains);
+  --radius-admin-sm: 3px;
+  --radius-admin-md: 4px;
+  --radius-admin-lg: 5px;
+  --radius-admin-xl: 6px;
+  --radius-admin-2xl: 8px;
+  --radius-admin-3xl: 10px;
 }
 
 /* Global styles */

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Sidebar } from "@/components/admin/Sidebar";
+import { Shell } from "@/components/admin/Shell";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -29,11 +29,8 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar />
-      <main className="pl-64">
-        <div className="p-8">{children}</div>
-      </main>
+    <div data-surface="admin" data-palette="claret">
+      <Shell breadcrumb={["Bentropy"]}>{children}</Shell>
     </div>
   );
 }
